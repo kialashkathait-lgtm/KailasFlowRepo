@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       jar_file:
-        description: 'JAR file name (e.g. hellomule.jar)'
+        description: 'JAR file name (e.g. subflowsprivateflows (1).jar)'
         required: true
         type: string
 
