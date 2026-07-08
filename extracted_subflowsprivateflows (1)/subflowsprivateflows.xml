@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="61c90497-2f9c-4b48-a660-a5807f7f058d" >
+		<http:listener-connection host="0.0.0.0" port="${http.port}" />
+	</http:listener-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="1446af16-7446-4fa8-83d2-22225434bdad" file="config.properties" />
+	<flow name="subflowsprivateflowsFlow" doc:id="d0f000fd-e79e-431c-bb58-41d3968bf0df" >
+		<http:listener doc:name="Listener" doc:id="cad23119-3992-454b-bf97-292978220e41" config-ref="HTTP_Listener_config" path="/subprivateflows"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b1c4f100-1d58-44d3-a815-30e58846fdc0" message="Before setting the varaiable "/>
+		<ee:transform doc:name="Transform Message" doc:id="44b8e048-4ca7-49d5-a0e0-7f72b2cc9216" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+var a=[
+    {
+    "name":"Balaji",
+    "id":1,
+    "org":"growth arc"
+},
+{
+    "name":"Balaji1",
+    "id":2,
+    "org":"growth arc"
+},
+{
+    "name":"Balaji2",
+    "id":3,
+    "org":"growth arc"
+}
+]
+output application/xml
+---
+hi: a]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="parameter" ><![CDATA[attributes.queryParams.name]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="3847f76e-641d-4cf1-a8cb-65507565e6af" message="#[vars.parameter]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8c726ea8-5f6b-423f-85e7-fb5c4c66ab71" message="#[p('message')]"/>
+	</flow>
+	<flow name="subflowsprivateflowsFlow1" doc:id="e9a4cd39-d06a-4f6d-9b69-20a8c734cd8e" >
+		<set-payload value='#["Now you are in private flow "]' doc:name="muleprivateflow" doc:id="0cfffe16-4c45-4be7-82cf-7c360cca16a3" />
+		<set-variable value="#[attributes.queryParams.name]" doc:name="Set Variable" doc:id="bf1f6aa0-9442-4f65-bc2f-7527cda5b6ef" variableName="parameter" />
+		<set-payload value='#["Hii " ++ vars.parameter as String]' doc:name="Set Payload" doc:id="25c59ba8-e303-4b98-902a-dc37ae6f0e67" />
+	</flow>
+</mule>
