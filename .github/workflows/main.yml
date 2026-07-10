@@ -1,836 +1,1672 @@
+# Comment: name: MuleSoft JAR Documentation Generator (Claude API)
 name: MuleSoft JAR Documentation Generator (Claude API)
+# Blank line
 
+# Comment: on:
 on:
+# Comment: workflow_dispatch:
   workflow_dispatch:
+# Comment: inputs:
     inputs:
+# Comment: jar_file:
       jar_file:
+# Comment: description: 'JAR file name (e.g. subflowsprivateflows (1).jar)'
         description: 'JAR file name (e.g. subflowsprivateflows (1).jar)'
+# Comment: required: true
         required: true
+# Comment: type: string
         type: string
+# Blank line
 
+# Comment: permissions:
 permissions:
+# Comment: contents: write
   contents: write
+# Blank line
 
+# Comment: jobs:
 jobs:
+# Comment: generate-docs:
   generate-docs:
+# Comment: runs-on: ubuntu-latest
     runs-on: ubuntu-latest
+# Comment: steps:
     steps:
+# Comment: - name: Checkout repo
       - name: Checkout repo
+# Comment: uses: actions/checkout@v3
         uses: actions/checkout@v3
+# Comment: with:
         with:
+# Comment: token: ${{ secrets.PAT_TOKEN }}
           token: ${{ secrets.PAT_TOKEN }}
+# Comment: persist-credentials: true
           persist-credentials: true
+# Comment: fetch-depth: 0
           fetch-depth: 0
+# Blank line
 
+# Comment: - name: Validate JAR exists
       - name: Validate JAR exists
+# Comment: run: |
         run: |
+# Comment: if [ ! -f "${{ github.event.inputs.jar_file }}" ]; then
           if [ ! -f "${{ github.event.inputs.jar_file }}" ]; then
+# Comment: echo "ERROR: JAR file '${{ github.event.inputs.jar_file }}' not found."
             echo "ERROR: JAR file '${{ github.event.inputs.jar_file }}' not found."
+# Comment: exit 1
             exit 1
+# Comment: fi
           fi
+# Blank line
 
+# Comment: - name: Extract JAR
       - name: Extract JAR
+# Comment: run: |
         run: |
+# Comment: JAR_NAME="${{ github.event.inputs.jar_file }}"
           JAR_NAME="${{ github.event.inputs.jar_file }}"
+# Comment: EXTRACT_DIR="extracted_${JAR_NAME%.jar}"
           EXTRACT_DIR="extracted_${JAR_NAME%.jar}"
+# Comment: mkdir -p "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
+# Comment: unzip -o "$JAR_NAME" -d "$EXTRACT_DIR/"
           unzip -o "$JAR_NAME" -d "$EXTRACT_DIR/"
+# Comment: echo "EXTRACT_DIR=$EXTRACT_DIR" >> $GITHUB_ENV
           echo "EXTRACT_DIR=$EXTRACT_DIR" >> $GITHUB_ENV
+# Comment: echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
           echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+# Blank line
 
+# Comment: - name: Install dependencies
       - name: Install dependencies
+# Comment: run: pip install python-docx anthropic
         run: pip install python-docx anthropic
+# Blank line
 
+# Comment: - name: Write Python script
       - name: Write Python script
+# Comment: run: |
         run: |
+# Comment: cat > /tmp/generate_docs.py << 'SCRIPTEOF'
           cat > /tmp/generate_docs.py << 'SCRIPTEOF'
+# Comment: import os, re, time, xml.etree.ElementTree as ET
           import os, re, time, xml.etree.ElementTree as ET
+# Comment: from datetime import date
           from datetime import date
+# Comment: import anthropic
           import anthropic
+# Comment: from docx import Document
           from docx import Document
+# Comment: from docx.shared import Pt, RGBColor, Inches
           from docx.shared import Pt, RGBColor, Inches
+# Comment: from docx.enum.text import WD_ALIGN_PARAGRAPH
           from docx.enum.text import WD_ALIGN_PARAGRAPH
+# Comment: from docx.oxml.ns import qn
           from docx.oxml.ns import qn
+# Comment: from docx.oxml import OxmlElement
           from docx.oxml import OxmlElement
+# Blank line
 
+# Comment: EXTRACT_DIR = os.environ.get('EXTRACT_DIR', 'extracted')
           EXTRACT_DIR = os.environ.get('EXTRACT_DIR', 'extracted')
+# Comment: JAR_NAME    = os.environ.get('JAR_NAME', 'unknown.jar')
           JAR_NAME    = os.environ.get('JAR_NAME', 'unknown.jar')
+# Comment: TODAY       = date.today().isoformat()
           TODAY       = date.today().isoformat()
+# Comment: GITHUB_REF  = os.environ.get('GITHUB_REF_NAME', 'N/A')
           GITHUB_REF  = os.environ.get('GITHUB_REF_NAME', 'N/A')
+# Comment: GITHUB_SHA  = os.environ.get('GITHUB_SHA', 'N/A')[:8]
           GITHUB_SHA  = os.environ.get('GITHUB_SHA', 'N/A')[:8]
+# Comment: DOC_NAME    = JAR_NAME.replace('.jar', '') + '-flow-documentation.docx'
           DOC_NAME    = JAR_NAME.replace('.jar', '') + '-flow-documentation.docx'
+# Comment: # ── Safe API key diagnostic — never prints the actual key ──
           # ── Safe API key diagnostic — never prints the actual key ──
+# Comment: _raw_key = os.environ.get('ANTHROPIC_API_KEY', '')
           _raw_key = os.environ.get('ANTHROPIC_API_KEY', '')
+# Comment: _key     = _raw_key.strip()
           _key     = _raw_key.strip()
+# Comment: print('=' * 70)
           print('=' * 70)
+# Comment: print('API KEY DIAGNOSTIC')
           print('API KEY DIAGNOSTIC')
+# Comment: print(f'  key present          : {bool(_key)}')
           print(f'  key present          : {bool(_key)}')
+# Comment: print(f'  key length           : {len(_key)}')
           print(f'  key length           : {len(_key)}')
+# Comment: print(f'  key had whitespace   : {_raw_key != _key}')
           print(f'  key had whitespace   : {_raw_key != _key}')
+# Comment: print(f'  starts with sk-ant-  : {_key.startswith("sk-ant-")}')
           print(f'  starts with sk-ant-  : {_key.startswith("sk-ant-")}')
+# Comment: print(f'  first 10 chars       : {_key[:10] if _key else "(empty)"}...')
           print(f'  first 10 chars       : {_key[:10] if _key else "(empty)"}...')
+# Comment: print('=' * 70)
           print('=' * 70)
+# Comment: if not _key:
           if not _key:
+# Comment: raise SystemExit(
               raise SystemExit(
+# Comment: 'FATAL: ANTHROPIC_API_KEY is empty. Check that the secret is set '
                   'FATAL: ANTHROPIC_API_KEY is empty. Check that the secret is set '
+# Comment: 'as a Repository secret (not Environment secret unless this job '
                   'as a Repository secret (not Environment secret unless this job '
+# Comment: 'declares environment:), and that the workflow step passes it via env:.'
                   'declares environment:), and that the workflow step passes it via env:.'
+# Comment: )
               )
+# Comment: if not _key.startswith('sk-ant-'):
           if not _key.startswith('sk-ant-'):
+# Comment: print('WARNING: key does not start with expected "sk-ant-" prefix. '
               print('WARNING: key does not start with expected "sk-ant-" prefix. '
+# Comment: 'Double check you copied the full key from console.anthropic.com '
                     'Double check you copied the full key from console.anthropic.com '
+# Comment: 'with no truncation or extra characters.')
                     'with no truncation or extra characters.')
+# Blank line
 
+# Comment: client       = anthropic.Anthropic(api_key=_key)
           client       = anthropic.Anthropic(api_key=_key)
+# Comment: MULE_CORE_NS = 'http://www.mulesoft.org/schema/mule/core'
           MULE_CORE_NS = 'http://www.mulesoft.org/schema/mule/core'
+# Blank line
 
+# Comment: def read_xml(path):
           def read_xml(path):
+# Comment: try:
               try:
+# Comment: with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                   with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+# Comment: return f.read()
                       return f.read()
+# Comment: except:
               except:
+# Comment: return ''
                   return ''
+# Blank line
 
+# Comment: # ── Full diagnostic dump — show absolutely everything on disk ──
           # ── Full diagnostic dump — show absolutely everything on disk ──
+# Comment: print('=' * 70)
           print('=' * 70)
+# Comment: print(f'EXTRACT_DIR env var = {EXTRACT_DIR!r}')
           print(f'EXTRACT_DIR env var = {EXTRACT_DIR!r}')
+# Comment: print(f'EXTRACT_DIR exists  = {os.path.exists(EXTRACT_DIR)}')
           print(f'EXTRACT_DIR exists  = {os.path.exists(EXTRACT_DIR)}')
+# Comment: print(f'Current working dir = {os.getcwd()}')
           print(f'Current working dir = {os.getcwd()}')
+# Comment: print(f'Contents of cwd     = {os.listdir(".")}')
           print(f'Contents of cwd     = {os.listdir(".")}')
+# Comment: print('=' * 70)
           print('=' * 70)
+# Blank line
 
+# Comment: if os.path.exists(EXTRACT_DIR):
           if os.path.exists(EXTRACT_DIR):
+# Comment: print(f'--- Full file tree under {EXTRACT_DIR} ---')
               print(f'--- Full file tree under {EXTRACT_DIR} ---')
+# Comment: for root, dirs, files in os.walk(EXTRACT_DIR):
               for root, dirs, files in os.walk(EXTRACT_DIR):
+# Comment: for f in files:
                   for f in files:
+# Comment: print(f'  {os.path.join(root, f)}')
                       print(f'  {os.path.join(root, f)}')
+# Comment: else:
           else:
+# Comment: print(f'!!! EXTRACT_DIR does not exist: {EXTRACT_DIR}')
               print(f'!!! EXTRACT_DIR does not exist: {EXTRACT_DIR}')
+# Blank line
 
+# Comment: # ── Collect every .xml file anywhere under EXTRACT_DIR ──
           # ── Collect every .xml file anywhere under EXTRACT_DIR ──
+# Comment: # No filtering, no namespace checks, no skipped directories.
           # No filtering, no namespace checks, no skipped directories.
+# Comment: # Every single .xml file found will be sent to Claude.
           # Every single .xml file found will be sent to Claude.
+# Comment: xml_files = []
           xml_files = []
+# Comment: seen_filenames = set()
           seen_filenames = set()
+# Blank line
 
+# Comment: if os.path.exists(EXTRACT_DIR):
           if os.path.exists(EXTRACT_DIR):
+# Comment: for root, dirs, files in os.walk(EXTRACT_DIR):
               for root, dirs, files in os.walk(EXTRACT_DIR):
+# Comment: for f in sorted(files):
                   for f in sorted(files):
+# Comment: if f.lower().endswith('.xml'):
                       if f.lower().endswith('.xml'):
+# Comment: full = os.path.join(root, f)
                           full = os.path.join(root, f)
+# Comment: # De-dupe by filename, keep first occurrence
                           # De-dupe by filename, keep first occurrence
+# Comment: if f not in seen_filenames:
                           if f not in seen_filenames:
+# Comment: seen_filenames.add(f)
                               seen_filenames.add(f)
+# Comment: xml_files.append((f, full))
                               xml_files.append((f, full))
+# Blank line
 
+# Comment: print('=' * 70)
           print('=' * 70)
+# Comment: print(f'Total .xml files included for documentation: {len(xml_files)}')
           print(f'Total .xml files included for documentation: {len(xml_files)}')
+# Comment: for fname, fpath in xml_files:
           for fname, fpath in xml_files:
+# Comment: size = os.path.getsize(fpath) if os.path.exists(fpath) else 0
               size = os.path.getsize(fpath) if os.path.exists(fpath) else 0
+# Comment: print(f'  {fpath}  ({size} bytes)')
               print(f'  {fpath}  ({size} bytes)')
+# Comment: print('=' * 70)
           print('=' * 70)
+# Blank line
 
+# Comment: SYSTEM_PROMPT = open('/tmp/claude_prompt.txt').read()
           SYSTEM_PROMPT = open('/tmp/claude_prompt.txt').read()
+# Blank line
 
+# Comment: def call_claude(filename, xml_content):
           def call_claude(filename, xml_content):
+# Comment: print(f'  Calling Claude for: {filename} ({len(xml_content)} chars)...')
               print(f'  Calling Claude for: {filename} ({len(xml_content)} chars)...')
+# Comment: if len(xml_content) > 90000:
               if len(xml_content) > 90000:
+# Comment: xml_content = xml_content[:90000] + '\n<!-- TRUNCATED -->'
                   xml_content = xml_content[:90000] + '\n<!-- TRUNCATED -->'
+# Comment: try:
               try:
+# Comment: msg = client.messages.create(
                   msg = client.messages.create(
+# Comment: model='claude-sonnet-4-6',
                       model='claude-sonnet-4-6',
+# Comment: max_tokens=8000,
                       max_tokens=8000,
+# Comment: system=SYSTEM_PROMPT,
                       system=SYSTEM_PROMPT,
+# Comment: messages=[{
                       messages=[{
+# Comment: 'role': 'user',
                           'role': 'user',
+# Comment: 'content': f'Document ALL flows in this MuleSoft XML file named `{filename}`.\n\
                           'content': f'Document ALL flows in this MuleSoft XML file named `{filename}`.\n\n{xml_content}'
+# Comment: }]
                       }]
+# Comment: )
                   )
+# Comment: return msg.content[0].text.strip()
                   return msg.content[0].text.strip()
+# Comment: except anthropic.AuthenticationError as e:
               except anthropic.AuthenticationError as e:
+# Comment: print('=' * 70)
                   print('=' * 70)
+# Comment: print(f'  AUTHENTICATION ERROR for {filename}: {e}')
                   print(f'  AUTHENTICATION ERROR for {filename}: {e}')
+# Comment: print('  This means the API key was rejected by Anthropic.')
                   print('  This means the API key was rejected by Anthropic.')
+# Comment: print('  Most likely causes:')
                   print('  Most likely causes:')
+# Comment: print('    1. Secret value has a typo, truncation, or extra whitespace')
                   print('    1. Secret value has a typo, truncation, or extra whitespace')
+# Comment: print('    2. Secret is an Environment secret but job has no environment: set')
                   print('    2. Secret is an Environment secret but job has no environment: set')
+# Comment: print('    3. Key was revoked/rotated in console.anthropic.com')
                   print('    3. Key was revoked/rotated in console.anthropic.com')
+# Comment: print('    4. Wrong secret name referenced in workflow env: block')
                   print('    4. Wrong secret name referenced in workflow env: block')
+# Comment: print('=' * 70)
                   print('=' * 70)
+# Comment: raise SystemExit(1)
                   raise SystemExit(1)
+# Comment: except Exception as e:
               except Exception as e:
+# Comment: print(f'  API error for {filename}: {e}')
                   print(f'  API error for {filename}: {e}')
+# Comment: return None
                   return None
+# Blank line
 
+# Comment: def parse_flow_blocks(response_text):
           def parse_flow_blocks(response_text):
+# Comment: blocks = []
               blocks = []
+# Comment: parts = re.split(r'@@FLOW_START@@', response_text)
               parts = re.split(r'@@FLOW_START@@', response_text)
+# Comment: for part in parts:
               for part in parts:
+# Comment: part = part.strip()
                   part = part.strip()
+# Comment: if '@@FLOW_END@@' not in part:
                   if '@@FLOW_END@@' not in part:
+# Comment: continue
                       continue
+# Comment: content = part.split('@@FLOW_END@@')[0].strip()
                   content = part.split('@@FLOW_END@@')[0].strip()
+# Comment: name_match = re.search(r'FLOW_NAME:\s*(.+)', content)
                   name_match = re.search(r'FLOW_NAME:\s*(.+)', content)
+# Comment: type_match = re.search(r'FLOW_TYPE:\s*(.+)', content)
                   type_match = re.search(r'FLOW_TYPE:\s*(.+)', content)
+# Comment: name  = name_match.group(1).strip() if name_match else 'Unnamed Flow'
                   name  = name_match.group(1).strip() if name_match else 'Unnamed Flow'
+# Comment: ftype = type_match.group(1).strip() if type_match else 'flow'
                   ftype = type_match.group(1).strip() if type_match else 'flow'
+# Comment: blocks.append({'name': name, 'type': ftype, 'raw': content})
                   blocks.append({'name': name, 'type': ftype, 'raw': content})
+# Comment: return blocks
               return blocks
+# Blank line
 
+# Comment: SECTION_NAMES = [
           SECTION_NAMES = [
+# Comment: 'OVERVIEW','FLOW DIAGRAM','TRIGGER','INPUTS',
               'OVERVIEW','FLOW DIAGRAM','TRIGGER','INPUTS',
+# Comment: 'LOGIC STEPS','CONNECTORS USED','ERROR HANDLING',
               'LOGIC STEPS','CONNECTORS USED','ERROR HANDLING',
+# Comment: 'OUTPUTS','FLOW REFERENCES','CONFIGURATION PROPERTIES',
               'OUTPUTS','FLOW REFERENCES','CONFIGURATION PROPERTIES',
+# Comment: ]
           ]
+# Blank line
 
+# Comment: def get_section(raw, section_name):
           def get_section(raw, section_name):
+# Comment: # Match ##SECTION_NAME## marker style
               # Match ##SECTION_NAME## marker style
+# Comment: marker = f'##{section_name}##'
               marker = f'##{section_name}##'
+# Comment: if marker not in raw:
               if marker not in raw:
+# Comment: # fallback: plain header style
                   # fallback: plain header style
+# Comment: pattern = rf'{re.escape(section_name)}\s*\n(.*?)(?=\n(?:{"|".join(re.escape(s) f
                   pattern = rf'{re.escape(section_name)}\s*\n(.*?)(?=\n(?:{"|".join(re.escape(s) for s in SECTION_NAMES)})\s*\n|##|$)'
+# Comment: match = re.search(pattern, raw, re.DOTALL)
                   match = re.search(pattern, raw, re.DOTALL)
+# Comment: return match.group(1).strip() if match else ''
                   return match.group(1).strip() if match else ''
+# Comment: # Split on ## markers
               # Split on ## markers
+# Comment: after  = raw.split(marker, 1)[1]
               after  = raw.split(marker, 1)[1]
+# Comment: # End at next ## marker or end of string
               # End at next ## marker or end of string
+# Comment: end    = re.search(r'##[A-Z]', after)
               end    = re.search(r'##[A-Z]', after)
+# Comment: result = after[:end.start()].strip() if end else after.strip()
               result = after[:end.start()].strip() if end else after.strip()
+# Comment: return result
               return result
+# Blank line
 
+# Comment: BLUE_DARK  = RGBColor(0x1F, 0x49, 0x7D)
           BLUE_DARK  = RGBColor(0x1F, 0x49, 0x7D)
+# Comment: BLUE_MID   = RGBColor(0x2E, 0x75, 0xB6)
           BLUE_MID   = RGBColor(0x2E, 0x75, 0xB6)
+# Comment: BLUE_LIGHT = RGBColor(0x44, 0x72, 0xC4)
           BLUE_LIGHT = RGBColor(0x44, 0x72, 0xC4)
+# Comment: WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
           WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
+# Comment: GREY       = RGBColor(0x55, 0x55, 0x55)
           GREY       = RGBColor(0x55, 0x55, 0x55)
+# Comment: GREEN      = RGBColor(0x1E, 0x6B, 0x3A)
           GREEN      = RGBColor(0x1E, 0x6B, 0x3A)
+# Comment: BLACK      = RGBColor(0x00, 0x00, 0x00)
           BLACK      = RGBColor(0x00, 0x00, 0x00)
+# Comment: CODE_BG    = 'F2F2F2'
           CODE_BG    = 'F2F2F2'
+# Blank line
 
+# Comment: def shade_cell(cell, hex_color):
           def shade_cell(cell, hex_color):
+# Comment: tc = cell._tc
               tc = cell._tc
+# Comment: tcPr = tc.get_or_add_tcPr()
               tcPr = tc.get_or_add_tcPr()
+# Comment: shd = OxmlElement('w:shd')
               shd = OxmlElement('w:shd')
+# Comment: shd.set(qn('w:val'), 'clear')
               shd.set(qn('w:val'), 'clear')
+# Comment: shd.set(qn('w:color'), 'auto')
               shd.set(qn('w:color'), 'auto')
+# Comment: shd.set(qn('w:fill'), hex_color)
               shd.set(qn('w:fill'), hex_color)
+# Comment: tcPr.append(shd)
               tcPr.append(shd)
+# Blank line
 
+# Comment: def add_divider(doc):
           def add_divider(doc):
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: p.paragraph_format.space_before = Pt(2)
               p.paragraph_format.space_before = Pt(2)
+# Comment: p.paragraph_format.space_after = Pt(4)
               p.paragraph_format.space_after = Pt(4)
+# Comment: pPr = p._p.get_or_add_pPr()
               pPr = p._p.get_or_add_pPr()
+# Comment: pBd = OxmlElement('w:pBdr')
               pBd = OxmlElement('w:pBdr')
+# Comment: bt = OxmlElement('w:bottom')
               bt = OxmlElement('w:bottom')
+# Comment: bt.set(qn('w:val'), 'single')
               bt.set(qn('w:val'), 'single')
+# Comment: bt.set(qn('w:sz'), '6')
               bt.set(qn('w:sz'), '6')
+# Comment: bt.set(qn('w:space'), '1')
               bt.set(qn('w:space'), '1')
+# Comment: bt.set(qn('w:color'), '2E75B6')
               bt.set(qn('w:color'), '2E75B6')
+# Comment: pBd.append(bt)
               pBd.append(bt)
+# Comment: pPr.append(pBd)
               pPr.append(pBd)
+# Blank line
 
+# Comment: def add_kv(doc, key, value, indent=False):
           def add_kv(doc, key, value, indent=False):
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: p.paragraph_format.space_after = Pt(2)
               p.paragraph_format.space_after = Pt(2)
+# Comment: if indent:
               if indent:
+# Comment: p.paragraph_format.left_indent = Inches(0.25)
                   p.paragraph_format.left_indent = Inches(0.25)
+# Comment: r1 = p.add_run(f'{key}: ')
               r1 = p.add_run(f'{key}: ')
+# Comment: r1.bold = True
               r1.bold = True
+# Comment: r1.font.color.rgb = BLUE_DARK
               r1.font.color.rgb = BLUE_DARK
+# Comment: r2 = p.add_run(str(value) if value else '---')
               r2 = p.add_run(str(value) if value else '---')
+# Comment: r2.font.color.rgb = BLACK
               r2.font.color.rgb = BLACK
+# Blank line
 
+# Comment: def add_bullet(doc, text, indent=0.25, color=None):
           def add_bullet(doc, text, indent=0.25, color=None):
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: p.paragraph_format.left_indent = Inches(indent)
               p.paragraph_format.left_indent = Inches(indent)
+# Comment: p.paragraph_format.space_after = Pt(2)
               p.paragraph_format.space_after = Pt(2)
+# Comment: run = p.add_run('- ' + str(text))
               run = p.add_run('- ' + str(text))
+# Comment: run.font.size = Pt(10)
               run.font.size = Pt(10)
+# Comment: if color:
               if color:
+# Comment: run.font.color.rgb = color
                   run.font.color.rgb = color
+# Blank line
 
+# Comment: def add_code_block(doc, code, indent=0.25):
           def add_code_block(doc, code, indent=0.25):
+# Comment: for line in str(code).strip().split('\n'):
               for line in str(code).strip().split('\n'):
+# Comment: p = doc.add_paragraph()
                   p = doc.add_paragraph()
+# Comment: p.paragraph_format.left_indent = Inches(indent)
                   p.paragraph_format.left_indent = Inches(indent)
+# Comment: p.paragraph_format.space_before = Pt(0)
                   p.paragraph_format.space_before = Pt(0)
+# Comment: p.paragraph_format.space_after = Pt(0)
                   p.paragraph_format.space_after = Pt(0)
+# Comment: pPr = p._p.get_or_add_pPr()
                   pPr = p._p.get_or_add_pPr()
+# Comment: shd = OxmlElement('w:shd')
                   shd = OxmlElement('w:shd')
+# Comment: shd.set(qn('w:val'), 'clear')
                   shd.set(qn('w:val'), 'clear')
+# Comment: shd.set(qn('w:color'), 'auto')
                   shd.set(qn('w:color'), 'auto')
+# Comment: shd.set(qn('w:fill'), CODE_BG)
                   shd.set(qn('w:fill'), CODE_BG)
+# Comment: pPr.append(shd)
                   pPr.append(shd)
+# Comment: run = p.add_run(line if line.strip() else ' ')
                   run = p.add_run(line if line.strip() else ' ')
+# Comment: run.font.name = 'Courier New'
                   run.font.name = 'Courier New'
+# Comment: run.font.size = Pt(8)
                   run.font.size = Pt(8)
+# Comment: run.font.color.rgb = BLACK
                   run.font.color.rgb = BLACK
+# Comment: doc.add_paragraph().paragraph_format.space_after = Pt(4)
               doc.add_paragraph().paragraph_format.space_after = Pt(4)
+# Blank line
 
+# Comment: def add_table_from_markdown(doc, md_table_text):
           def add_table_from_markdown(doc, md_table_text):
+# Comment: lines = [l.strip() for l in md_table_text.strip().split('\n')
               lines = [l.strip() for l in md_table_text.strip().split('\n')
+# Comment: if l.strip() and not re.match(r'^\|[-| :]+\|$', l.strip())]
                        if l.strip() and not re.match(r'^\|[-| :]+\|$', l.strip())]
+# Comment: if not lines:
               if not lines:
+# Comment: return
                   return
+# Comment: rows = []
               rows = []
+# Comment: for line in lines:
               for line in lines:
+# Comment: cells = [c.strip() for c in line.strip('|').split('|')]
                   cells = [c.strip() for c in line.strip('|').split('|')]
+# Comment: rows.append(cells)
                   rows.append(cells)
+# Comment: if not rows:
               if not rows:
+# Comment: return
                   return
+# Comment: headers = rows[0]
               headers = rows[0]
+# Comment: data_rows = rows[1:]
               data_rows = rows[1:]
+# Comment: num_cols = len(headers)
               num_cols = len(headers)
+# Comment: col_w = [6.3 / num_cols] * num_cols
               col_w = [6.3 / num_cols] * num_cols
+# Comment: tbl = doc.add_table(rows=1, cols=num_cols)
               tbl = doc.add_table(rows=1, cols=num_cols)
+# Comment: tbl.style = 'Table Grid'
               tbl.style = 'Table Grid'
+# Comment: hdr_cells = tbl.rows[0].cells
               hdr_cells = tbl.rows[0].cells
+# Comment: for i, h in enumerate(headers):
               for i, h in enumerate(headers):
+# Comment: hdr_cells[i].width = Inches(col_w[i])
                   hdr_cells[i].width = Inches(col_w[i])
+# Comment: shade_cell(hdr_cells[i], '2E75B6')
                   shade_cell(hdr_cells[i], '2E75B6')
+# Comment: run = hdr_cells[i].paragraphs[0].add_run(h)
                   run = hdr_cells[i].paragraphs[0].add_run(h)
+# Comment: run.bold = True
                   run.bold = True
+# Comment: run.font.color.rgb = WHITE
                   run.font.color.rgb = WHITE
+# Comment: run.font.size = Pt(10)
                   run.font.size = Pt(10)
+# Comment: for ri, row_data in enumerate(data_rows):
               for ri, row_data in enumerate(data_rows):
+# Comment: cells = tbl.add_row().cells
                   cells = tbl.add_row().cells
+# Comment: fill = 'EBF3FB' if ri % 2 == 0 else 'FFFFFF'
                   fill = 'EBF3FB' if ri % 2 == 0 else 'FFFFFF'
+# Comment: for i in range(num_cols):
                   for i in range(num_cols):
+# Comment: val = row_data[i] if i < len(row_data) else ''
                       val = row_data[i] if i < len(row_data) else ''
+# Comment: cells[i].width = Inches(col_w[i])
                       cells[i].width = Inches(col_w[i])
+# Comment: shade_cell(cells[i], fill)
                       shade_cell(cells[i], fill)
+# Comment: run = cells[i].paragraphs[0].add_run(val)
                       run = cells[i].paragraphs[0].add_run(val)
+# Comment: run.font.size = Pt(9)
                       run.font.size = Pt(9)
+# Comment: doc.add_paragraph().paragraph_format.space_after = Pt(4)
               doc.add_paragraph().paragraph_format.space_after = Pt(4)
+# Blank line
 
+# Comment: def render_logic_steps(doc, steps_text):
           def render_logic_steps(doc, steps_text):
+# Comment: if not steps_text.strip():
               if not steps_text.strip():
+# Comment: doc.add_paragraph('').add_run('No logic steps found.').italic = True
                   doc.add_paragraph('').add_run('No logic steps found.').italic = True
+# Comment: return
                   return
+# Comment: step_pattern = re.compile(
               step_pattern = re.compile(
+# Comment: r'^(STEP\s+[\w.]+:\s*.+?)(?=^STEP\s+[\w.]+:|\Z)',
                   r'^(STEP\s+[\w.]+:\s*.+?)(?=^STEP\s+[\w.]+:|\Z)',
+# Comment: re.MULTILINE | re.DOTALL
                   re.MULTILINE | re.DOTALL
+# Comment: )
               )
+# Comment: step_blocks = step_pattern.findall(steps_text)
               step_blocks = step_pattern.findall(steps_text)
+# Comment: if not step_blocks:
               if not step_blocks:
+# Comment: step_blocks = [steps_text]
                   step_blocks = [steps_text]
+# Comment: for block in step_blocks:
               for block in step_blocks:
+# Comment: block = block.strip()
                   block = block.strip()
+# Comment: if not block:
                   if not block:
+# Comment: continue
                       continue
+# Comment: lines = block.split('\n')
                   lines = block.split('\n')
+# Comment: first_line = lines[0].strip()
                   first_line = lines[0].strip()
+# Comment: step_match = re.match(r'STEP\s+([\w.]+):\s*(.+)', first_line, re.IGNORECASE)
                   step_match = re.match(r'STEP\s+([\w.]+):\s*(.+)', first_line, re.IGNORECASE)
+# Comment: if step_match:
                   if step_match:
+# Comment: step_num = step_match.group(1)
                       step_num = step_match.group(1)
+# Comment: comp_name = step_match.group(2).strip()
                       comp_name = step_match.group(2).strip()
+# Comment: else:
                   else:
+# Comment: step_num = '?'
                       step_num = '?'
+# Comment: comp_name = first_line
                       comp_name = first_line
+# Comment: p = doc.add_paragraph()
                   p = doc.add_paragraph()
+# Comment: p.paragraph_format.space_after = Pt(2)
                   p.paragraph_format.space_after = Pt(2)
+# Comment: p.paragraph_format.space_before = Pt(6)
                   p.paragraph_format.space_before = Pt(6)
+# Comment: num_run = p.add_run(f'Step {step_num}  ')
                   num_run = p.add_run(f'Step {step_num}  ')
+# Comment: num_run.bold = True
                   num_run.bold = True
+# Comment: num_run.font.color.rgb = BLUE_MID
                   num_run.font.color.rgb = BLUE_MID
+# Comment: num_run.font.size = Pt(11)
                   num_run.font.size = Pt(11)
+# Comment: comp_run = p.add_run(comp_name)
                   comp_run = p.add_run(comp_name)
+# Comment: comp_run.bold = True
                   comp_run.bold = True
+# Comment: comp_run.font.size = Pt(11)
                   comp_run.font.size = Pt(11)
+# Comment: comp_run.font.color.rgb = BLACK
                   comp_run.font.color.rgb = BLACK
+# Comment: body = '\n'.join(lines[1:])
                   body = '\n'.join(lines[1:])
+# Comment: desc_match = re.search(
                   desc_match = re.search(
+# Comment: r'Description:\s*(.+?)(?=\nDataWeave:|\nSQL:|\nROUTE\s|\nSTEP\s|\Z)',
                       r'Description:\s*(.+?)(?=\nDataWeave:|\nSQL:|\nROUTE\s|\nSTEP\s|\Z)',
+# Comment: body, re.DOTALL
                       body, re.DOTALL
+# Comment: )
                   )
+# Comment: if desc_match:
                   if desc_match:
+# Comment: dp = doc.add_paragraph()
                       dp = doc.add_paragraph()
+# Comment: dp.paragraph_format.left_indent = Inches(0.3)
                       dp.paragraph_format.left_indent = Inches(0.3)
+# Comment: dp.paragraph_format.space_after = Pt(2)
                       dp.paragraph_format.space_after = Pt(2)
+# Comment: dp.add_run(desc_match.group(1).strip()).font.size = Pt(10)
                       dp.add_run(desc_match.group(1).strip()).font.size = Pt(10)
+# Comment: for dw_label in ['DataWeave', 'SQL']:
                   for dw_label in ['DataWeave', 'SQL']:
+# Comment: dw_match = re.search(
                       dw_match = re.search(
+# Comment: rf'{dw_label}:\s*\n```[a-z]*\n(.*?)```',
                           rf'{dw_label}:\s*\n```[a-z]*\n(.*?)```',
+# Comment: body, re.DOTALL
                           body, re.DOTALL
+# Comment: )
                       )
+# Comment: if dw_match and dw_match.group(1).strip():
                       if dw_match and dw_match.group(1).strip():
+# Comment: lp = doc.add_paragraph()
                           lp = doc.add_paragraph()
+# Comment: lp.paragraph_format.left_indent = Inches(0.3)
                           lp.paragraph_format.left_indent = Inches(0.3)
+# Comment: lp.paragraph_format.space_after = Pt(1)
                           lp.paragraph_format.space_after = Pt(1)
+# Comment: lr = lp.add_run(f'{dw_label} Script:')
                           lr = lp.add_run(f'{dw_label} Script:')
+# Comment: lr.italic = True
                           lr.italic = True
+# Comment: lr.font.color.rgb = GREEN
                           lr.font.color.rgb = GREEN
+# Comment: lr.font.size = Pt(9)
                           lr.font.size = Pt(9)
+# Comment: add_code_block(doc, dw_match.group(1).strip(), indent=0.4)
                           add_code_block(doc, dw_match.group(1).strip(), indent=0.4)
+# Comment: route_pattern = re.compile(
                   route_pattern = re.compile(
+# Comment: r'^(\s*ROUTE\s+.+?)(?=^\s*ROUTE\s+|\Z)',
                       r'^(\s*ROUTE\s+.+?)(?=^\s*ROUTE\s+|\Z)',
+# Comment: re.MULTILINE | re.DOTALL
                       re.MULTILINE | re.DOTALL
+# Comment: )
                   )
+# Comment: for rb in route_pattern.findall(body):
                   for rb in route_pattern.findall(body):
+# Comment: rb = rb.strip()
                       rb = rb.strip()
+# Comment: if not rb:
                       if not rb:
+# Comment: continue
                           continue
+# Comment: route_label_match = re.match(r'ROUTE\s+(.+)', rb.split('\n')[0].strip())
                       route_label_match = re.match(r'ROUTE\s+(.+)', rb.split('\n')[0].strip())
+# Comment: route_label = route_label_match.group(1).strip() if route_label_match else 'Rout
                       route_label = route_label_match.group(1).strip() if route_label_match else 'Route'
+# Comment: rp = doc.add_paragraph()
                       rp = doc.add_paragraph()
+# Comment: rp.paragraph_format.left_indent = Inches(0.35)
                       rp.paragraph_format.left_indent = Inches(0.35)
+# Comment: rp.paragraph_format.space_after = Pt(1)
                       rp.paragraph_format.space_after = Pt(1)
+# Comment: rr = rp.add_run(f'Route: {route_label}')
                       rr = rp.add_run(f'Route: {route_label}')
+# Comment: rr.bold = True
                       rr.bold = True
+# Comment: rr.font.color.rgb = BLUE_LIGHT
                       rr.font.color.rgb = BLUE_LIGHT
+# Comment: rr.font.size = Pt(10)
                       rr.font.size = Pt(10)
+# Comment: inner_steps = re.compile(
                       inner_steps = re.compile(
+# Comment: r'^(\s*STEP\s+[\w.]+:\s*.+?)(?=^\s*STEP\s+[\w.]+:|\Z)',
                           r'^(\s*STEP\s+[\w.]+:\s*.+?)(?=^\s*STEP\s+[\w.]+:|\Z)',
+# Comment: re.MULTILINE | re.DOTALL
                           re.MULTILINE | re.DOTALL
+# Comment: ).findall(rb)
                       ).findall(rb)
+# Comment: for inner in inner_steps:
                       for inner in inner_steps:
+# Comment: inner = inner.strip()
                           inner = inner.strip()
+# Comment: inner_lines = inner.split('\n')
                           inner_lines = inner.split('\n')
+# Comment: inner_first = inner_lines[0].strip()
                           inner_first = inner_lines[0].strip()
+# Comment: im = re.match(r'STEP\s+([\w.]+):\s*(.+)', inner_first, re.IGNORECASE)
                           im = re.match(r'STEP\s+([\w.]+):\s*(.+)', inner_first, re.IGNORECASE)
+# Comment: if im:
                           if im:
+# Comment: in_num = im.group(1)
                               in_num = im.group(1)
+# Comment: in_comp = im.group(2).strip()
                               in_comp = im.group(2).strip()
+# Comment: else:
                           else:
+# Comment: in_num = '?'
                               in_num = '?'
+# Comment: in_comp = inner_first
                               in_comp = inner_first
+# Comment: ip = doc.add_paragraph()
                           ip = doc.add_paragraph()
+# Comment: ip.paragraph_format.left_indent = Inches(0.5)
                           ip.paragraph_format.left_indent = Inches(0.5)
+# Comment: ip.paragraph_format.space_after = Pt(1)
                           ip.paragraph_format.space_after = Pt(1)
+# Comment: ir1 = ip.add_run(f'Step {in_num}  ')
                           ir1 = ip.add_run(f'Step {in_num}  ')
+# Comment: ir1.bold = True
                           ir1.bold = True
+# Comment: ir1.font.color.rgb = BLUE_MID
                           ir1.font.color.rgb = BLUE_MID
+# Comment: ir1.font.size = Pt(10)
                           ir1.font.size = Pt(10)
+# Comment: ir2 = ip.add_run(in_comp)
                           ir2 = ip.add_run(in_comp)
+# Comment: ir2.bold = True
                           ir2.bold = True
+# Comment: ir2.font.size = Pt(10)
                           ir2.font.size = Pt(10)
+# Comment: ir2.font.color.rgb = BLACK
                           ir2.font.color.rgb = BLACK
+# Comment: inner_body = '\n'.join(inner_lines[1:])
                           inner_body = '\n'.join(inner_lines[1:])
+# Comment: id_match = re.search(
                           id_match = re.search(
+# Comment: r'Description:\s*(.+?)(?=\nDataWeave:|\nSQL:|\nSTEP\s|\Z)',
                               r'Description:\s*(.+?)(?=\nDataWeave:|\nSQL:|\nSTEP\s|\Z)',
+# Comment: inner_body, re.DOTALL
                               inner_body, re.DOTALL
+# Comment: )
                           )
+# Comment: if id_match:
                           if id_match:
+# Comment: idp = doc.add_paragraph()
                               idp = doc.add_paragraph()
+# Comment: idp.paragraph_format.left_indent = Inches(0.65)
                               idp.paragraph_format.left_indent = Inches(0.65)
+# Comment: idp.paragraph_format.space_after = Pt(1)
                               idp.paragraph_format.space_after = Pt(1)
+# Comment: idp.add_run(id_match.group(1).strip()).font.size = Pt(9)
                               idp.add_run(id_match.group(1).strip()).font.size = Pt(9)
+# Comment: for dw_label in ['DataWeave', 'SQL']:
                           for dw_label in ['DataWeave', 'SQL']:
+# Comment: idw = re.search(
                               idw = re.search(
+# Comment: rf'{dw_label}:\s*\n```[a-z]*\n(.*?)```',
                                   rf'{dw_label}:\s*\n```[a-z]*\n(.*?)```',
+# Comment: inner_body, re.DOTALL
                                   inner_body, re.DOTALL
+# Comment: )
                               )
+# Comment: if idw and idw.group(1).strip():
                               if idw and idw.group(1).strip():
+# Comment: ilp = doc.add_paragraph()
                                   ilp = doc.add_paragraph()
+# Comment: ilp.paragraph_format.left_indent = Inches(0.65)
                                   ilp.paragraph_format.left_indent = Inches(0.65)
+# Comment: ilp.paragraph_format.space_after = Pt(1)
                                   ilp.paragraph_format.space_after = Pt(1)
+# Comment: ilr = ilp.add_run(f'{dw_label} Script:')
                                   ilr = ilp.add_run(f'{dw_label} Script:')
+# Comment: ilr.italic = True
                                   ilr.italic = True
+# Comment: ilr.font.color.rgb = GREEN
                                   ilr.font.color.rgb = GREEN
+# Comment: ilr.font.size = Pt(9)
                                   ilr.font.size = Pt(9)
+# Comment: add_code_block(doc, idw.group(1).strip(), indent=0.75)
                                   add_code_block(doc, idw.group(1).strip(), indent=0.75)
+# Comment: sep = doc.add_paragraph()
                   sep = doc.add_paragraph()
+# Comment: sep.paragraph_format.space_after = Pt(3)
                   sep.paragraph_format.space_after = Pt(3)
+# Blank line
 
+# Comment: def render_flow(doc, block, filename):
           def render_flow(doc, block, filename):
+# Comment: name  = block['name']
               name  = block['name']
+# Comment: ftype = block['type']
               ftype = block['type']
+# Comment: raw   = block['raw']
               raw   = block['raw']
+# Blank line
 
+# Comment: # Flow heading
               # Flow heading
+# Comment: doc.add_heading(f'Flow: {name}', level=2)
               doc.add_heading(f'Flow: {name}', level=2)
+# Comment: add_kv(doc, 'Source File', filename)
               add_kv(doc, 'Source File', filename)
+# Comment: add_kv(doc, 'Flow Type', ftype)
               add_kv(doc, 'Flow Type', ftype)
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: # Overview
               # Overview
+# Comment: overview = get_section(raw, 'OVERVIEW')
               overview = get_section(raw, 'OVERVIEW')
+# Comment: if overview:
               if overview:
+# Comment: doc.add_heading('Overview', level=3)
                   doc.add_heading('Overview', level=3)
+# Comment: p = doc.add_paragraph(overview)
                   p = doc.add_paragraph(overview)
+# Comment: p.paragraph_format.space_after = Pt(6)
                   p.paragraph_format.space_after = Pt(6)
+# Blank line
 
+# Comment: # Flow Diagram
               # Flow Diagram
+# Comment: diagram = get_section(raw, 'FLOW DIAGRAM')
               diagram = get_section(raw, 'FLOW DIAGRAM')
+# Comment: if diagram and diagram.strip():
               if diagram and diagram.strip():
+# Comment: doc.add_heading('Flow Diagram', level=3)
                   doc.add_heading('Flow Diagram', level=3)
+# Comment: note_p = doc.add_paragraph()
                   note_p = doc.add_paragraph()
+# Comment: note_r = note_p.add_run('Mermaid diagram - paste into https://mermaid.live to re
                   note_r = note_p.add_run('Mermaid diagram - paste into https://mermaid.live to render visually')
+# Comment: note_r.italic = True
                   note_r.italic = True
+# Comment: note_r.font.size = Pt(9)
                   note_r.font.size = Pt(9)
+# Comment: note_r.font.color.rgb = GREY
                   note_r.font.color.rgb = GREY
+# Comment: diagram_clean = re.sub(r'^```[a-z]*\n?', '', diagram.strip())
                   diagram_clean = re.sub(r'^```[a-z]*\n?', '', diagram.strip())
+# Comment: diagram_clean = re.sub(r'\n?```$', '', diagram_clean).strip()
                   diagram_clean = re.sub(r'\n?```$', '', diagram_clean).strip()
+# Comment: if not diagram_clean.startswith('graph'):
                   if not diagram_clean.startswith('graph'):
+# Comment: diagram_clean = 'graph TD\n' + diagram_clean
                       diagram_clean = 'graph TD\n' + diagram_clean
+# Comment: add_code_block(doc, diagram_clean, indent=0.2)
                   add_code_block(doc, diagram_clean, indent=0.2)
+# Blank line
 
+# Comment: # Trigger
               # Trigger
+# Comment: trigger = get_section(raw, 'TRIGGER')
               trigger = get_section(raw, 'TRIGGER')
+# Comment: if trigger:
               if trigger:
+# Comment: doc.add_heading('Trigger', level=3)
                   doc.add_heading('Trigger', level=3)
+# Comment: for line in trigger.strip().split('\n'):
                   for line in trigger.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if not line:
                       if not line:
+# Comment: continue
                           continue
+# Comment: if ':' in line:
                       if ':' in line:
+# Comment: k, _, v = line.partition(':')
                           k, _, v = line.partition(':')
+# Comment: v = v.strip()
                           v = v.strip()
+# Comment: if v and v.lower() not in ('n/a','none','omit','<read from xml>',''):
                           if v and v.lower() not in ('n/a','none','omit','<read from xml>',''):
+# Comment: add_kv(doc, k.strip(), v, indent=True)
                               add_kv(doc, k.strip(), v, indent=True)
+# Comment: doc.add_paragraph()
                   doc.add_paragraph()
+# Blank line
 
+# Comment: # Inputs
               # Inputs
+# Comment: inputs = get_section(raw, 'INPUTS')
               inputs = get_section(raw, 'INPUTS')
+# Comment: if inputs:
               if inputs:
+# Comment: doc.add_heading('Inputs', level=3)
                   doc.add_heading('Inputs', level=3)
+# Comment: for line in inputs.strip().split('\n'):
                   for line in inputs.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if line and not line.startswith('<'):
                       if line and not line.startswith('<'):
+# Comment: add_bullet(doc, line)
                           add_bullet(doc, line)
+# Comment: doc.add_paragraph()
                   doc.add_paragraph()
+# Blank line
 
+# Comment: # Logic Steps — inline DataWeave
               # Logic Steps — inline DataWeave
+# Comment: logic = get_section(raw, 'LOGIC STEPS')
               logic = get_section(raw, 'LOGIC STEPS')
+# Comment: doc.add_heading('Logic Steps', level=3)
               doc.add_heading('Logic Steps', level=3)
+# Comment: intro = doc.add_paragraph()
               intro = doc.add_paragraph()
+# Comment: intro.add_run(
               intro.add_run(
+# Comment: 'Each step is documented below. DataWeave scripts are shown '
                   'Each step is documented below. DataWeave scripts are shown '
+# Comment: 'inline immediately beneath the step they belong to.'
                   'inline immediately beneath the step they belong to.'
+# Comment: ).italic = True
               ).italic = True
+# Comment: intro.paragraph_format.space_after = Pt(4)
               intro.paragraph_format.space_after = Pt(4)
+# Comment: if logic.strip():
               if logic.strip():
+# Comment: render_logic_steps(doc, logic)
                   render_logic_steps(doc, logic)
+# Comment: else:
               else:
+# Comment: doc.add_paragraph('').add_run('No logic steps found.').italic = True
                   doc.add_paragraph('').add_run('No logic steps found.').italic = True
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: # Connectors & Components
               # Connectors & Components
+# Comment: connectors = get_section(raw, 'CONNECTORS USED')
               connectors = get_section(raw, 'CONNECTORS USED')
+# Comment: doc.add_heading('Connectors & Components Used', level=3)
               doc.add_heading('Connectors & Components Used', level=3)
+# Comment: if connectors and '|' in connectors:
               if connectors and '|' in connectors:
+# Comment: add_table_from_markdown(doc, connectors)
                   add_table_from_markdown(doc, connectors)
+# Comment: elif connectors:
               elif connectors:
+# Comment: for line in connectors.strip().split('\n'):
                   for line in connectors.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if line:
                       if line:
+# Comment: add_bullet(doc, line)
                           add_bullet(doc, line)
+# Comment: else:
               else:
+# Comment: doc.add_paragraph('').add_run('None').italic = True
                   doc.add_paragraph('').add_run('None').italic = True
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: # Error Handling
               # Error Handling
+# Comment: error = get_section(raw, 'ERROR HANDLING')
               error = get_section(raw, 'ERROR HANDLING')
+# Comment: doc.add_heading('Error Handling', level=3)
               doc.add_heading('Error Handling', level=3)
+# Comment: if error and error.strip().lower() not in ('none',''):
               if error and error.strip().lower() not in ('none',''):
+# Comment: for line in error.strip().split('\n'):
                   for line in error.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if not line:
                       if not line:
+# Comment: continue
                           continue
+# Comment: if ':' in line:
                       if ':' in line:
+# Comment: k, _, v = line.partition(':')
                           k, _, v = line.partition(':')
+# Comment: if v.strip() and v.strip().lower() not in ('none','n/a'):
                           if v.strip() and v.strip().lower() not in ('none','n/a'):
+# Comment: add_kv(doc, k.strip(), v.strip(), indent=True)
                               add_kv(doc, k.strip(), v.strip(), indent=True)
+# Comment: else:
                       else:
+# Comment: add_bullet(doc, line)
                           add_bullet(doc, line)
+# Comment: else:
               else:
+# Comment: add_bullet(doc, 'Strategy: None explicitly defined')
                   add_bullet(doc, 'Strategy: None explicitly defined')
+# Comment: add_bullet(doc, 'Behaviour: Errors propagate to the default Mule error handler')
                   add_bullet(doc, 'Behaviour: Errors propagate to the default Mule error handler')
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: # Outputs
               # Outputs
+# Comment: outputs = get_section(raw, 'OUTPUTS')
               outputs = get_section(raw, 'OUTPUTS')
+# Comment: if outputs:
               if outputs:
+# Comment: doc.add_heading('Outputs', level=3)
                   doc.add_heading('Outputs', level=3)
+# Comment: for line in outputs.strip().split('\n'):
                   for line in outputs.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if not line or line.startswith('<'):
                       if not line or line.startswith('<'):
+# Comment: continue
                           continue
+# Comment: if ':' in line:
                       if ':' in line:
+# Comment: k, _, v = line.partition(':')
                           k, _, v = line.partition(':')
+# Comment: if v.strip():
                           if v.strip():
+# Comment: add_kv(doc, k.strip(), v.strip(), indent=True)
                               add_kv(doc, k.strip(), v.strip(), indent=True)
+# Comment: else:
                       else:
+# Comment: add_bullet(doc, line)
                           add_bullet(doc, line)
+# Comment: doc.add_paragraph()
                   doc.add_paragraph()
+# Blank line
 
+# Comment: # Flow References
               # Flow References
+# Comment: refs = get_section(raw, 'FLOW REFERENCES')
               refs = get_section(raw, 'FLOW REFERENCES')
+# Comment: doc.add_heading('Flow References', level=3)
               doc.add_heading('Flow References', level=3)
+# Comment: if refs and refs.strip().lower() not in ('none',''):
               if refs and refs.strip().lower() not in ('none',''):
+# Comment: for line in refs.strip().split('\n'):
                   for line in refs.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if line and not line.startswith('<'):
                       if line and not line.startswith('<'):
+# Comment: add_bullet(doc, line)
                           add_bullet(doc, line)
+# Comment: else:
               else:
+# Comment: doc.add_paragraph('').add_run('None').italic = True
                   doc.add_paragraph('').add_run('None').italic = True
+# Blank line
 
+# Comment: # Config Properties
               # Config Properties
+# Comment: props = get_section(raw, 'CONFIGURATION PROPERTIES')
               props = get_section(raw, 'CONFIGURATION PROPERTIES')
+# Comment: doc.add_heading('Configuration Properties Used', level=3)
               doc.add_heading('Configuration Properties Used', level=3)
+# Comment: if props and props.strip().lower() not in ('none',''):
               if props and props.strip().lower() not in ('none',''):
+# Comment: for line in props.strip().split('\n'):
                   for line in props.strip().split('\n'):
+# Comment: line = line.strip().lstrip('-').strip()
                       line = line.strip().lstrip('-').strip()
+# Comment: if line and not line.startswith('<'):
                       if line and not line.startswith('<'):
+# Comment: add_bullet(doc, line)
                           add_bullet(doc, line)
+# Comment: else:
               else:
+# Comment: doc.add_paragraph('').add_run('None').italic = True
                   doc.add_paragraph('').add_run('None').italic = True
+# Blank line
 
+# Comment: add_divider(doc)
               add_divider(doc)
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: all_results = []
           all_results = []
+# Comment: for fname, fpath in xml_files:
           for fname, fpath in xml_files:
+# Comment: xml_content = read_xml(fpath)
               xml_content = read_xml(fpath)
+# Comment: if not xml_content:
               if not xml_content:
+# Comment: print(f'  Skipping empty: {fname}')
                   print(f'  Skipping empty: {fname}')
+# Comment: continue
                   continue
+# Comment: response = call_claude(fname, xml_content)
               response = call_claude(fname, xml_content)
+# Comment: if response:
               if response:
+# Comment: blocks = parse_flow_blocks(response)
                   blocks = parse_flow_blocks(response)
+# Comment: print(f'  Parsed {len(blocks)} flow(s) from {fname}')
                   print(f'  Parsed {len(blocks)} flow(s) from {fname}')
+# Comment: all_results.append((fname, blocks))
                   all_results.append((fname, blocks))
+# Comment: time.sleep(1)
               time.sleep(1)
+# Blank line
 
+# Comment: total_flows = sum(len(b) for _, b in all_results)
           total_flows = sum(len(b) for _, b in all_results)
+# Comment: print(f'Total flows documented: {total_flows}')
           print(f'Total flows documented: {total_flows}')
+# Blank line
 
+# Comment: doc = Document()
           doc = Document()
+# Comment: cp = doc.add_paragraph()
           cp = doc.add_paragraph()
+# Comment: cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
           cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: cr = cp.add_run('MuleSoft Flow Documentation')
           cr = cp.add_run('MuleSoft Flow Documentation')
+# Comment: cr.bold = True
           cr.bold = True
+# Comment: cr.font.size = Pt(28)
           cr.font.size = Pt(28)
+# Comment: cr.font.color.rgb = BLUE_DARK
           cr.font.color.rgb = BLUE_DARK
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Comment: sp = doc.add_paragraph()
           sp = doc.add_paragraph()
+# Comment: sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
           sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: sr = sp.add_run(f'Generated from: {JAR_NAME}')
           sr = sp.add_run(f'Generated from: {JAR_NAME}')
+# Comment: sr.font.size = Pt(14)
           sr.font.size = Pt(14)
+# Comment: sr.font.color.rgb = BLUE_LIGHT
           sr.font.color.rgb = BLUE_LIGHT
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Comment: mp = doc.add_paragraph()
           mp = doc.add_paragraph()
+# Comment: mp.alignment = WD_ALIGN_PARAGRAPH.CENTER
           mp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: mr = mp.add_run(f'Date: {TODAY}  |  Branch: {GITHUB_REF}  |  Commit: {GITHUB_SHA
           mr = mp.add_run(f'Date: {TODAY}  |  Branch: {GITHUB_REF}  |  Commit: {GITHUB_SHA}')
+# Comment: mr.font.size = Pt(10)
           mr.font.size = Pt(10)
+# Comment: mr.font.color.rgb = GREY
           mr.font.color.rgb = GREY
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Comment: np = doc.add_paragraph()
           np = doc.add_paragraph()
+# Comment: np.alignment = WD_ALIGN_PARAGRAPH.CENTER
           np.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: nr = np.add_run('Generated by Claude AI (claude-sonnet-4-6)')
           nr = np.add_run('Generated by Claude AI (claude-sonnet-4-6)')
+# Comment: nr.font.size = Pt(10)
           nr.font.size = Pt(10)
+# Comment: nr.font.color.rgb = GREY
           nr.font.color.rgb = GREY
+# Comment: doc.add_page_break()
           doc.add_page_break()
+# Comment: doc.add_heading('Summary', level=1)
           doc.add_heading('Summary', level=1)
+# Comment: add_kv(doc, 'JAR File', JAR_NAME)
           add_kv(doc, 'JAR File', JAR_NAME)
+# Comment: add_kv(doc, 'Date', TODAY)
           add_kv(doc, 'Date', TODAY)
+# Comment: add_kv(doc, 'Branch/Commit', f'{GITHUB_REF} / {GITHUB_SHA}')
           add_kv(doc, 'Branch/Commit', f'{GITHUB_REF} / {GITHUB_SHA}')
+# Comment: add_kv(doc, 'Files Documented', str(len(all_results)))
           add_kv(doc, 'Files Documented', str(len(all_results)))
+# Comment: add_kv(doc, 'Total Flows', str(total_flows))
           add_kv(doc, 'Total Flows', str(total_flows))
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Comment: p = doc.add_paragraph(
           p = doc.add_paragraph(
+# Comment: f'This document covers {len(all_results)} Mule XML file(s) and '
               f'This document covers {len(all_results)} Mule XML file(s) and '
+# Comment: f'{total_flows} flow(s) extracted from {JAR_NAME}. '
               f'{total_flows} flow(s) extracted from {JAR_NAME}. '
+# Comment: f'Each flow section contains: overview, Mermaid flow diagram, trigger, '
               f'Each flow section contains: overview, Mermaid flow diagram, trigger, '
+# Comment: f'inputs, logic steps with inline DataWeave scripts, connectors used, '
               f'inputs, logic steps with inline DataWeave scripts, connectors used, '
+# Comment: f'error handling, outputs, flow references, and configuration properties. '
               f'error handling, outputs, flow references, and configuration properties. '
+# Comment: f'Documentation generated by Claude AI.'
               f'Documentation generated by Claude AI.'
+# Comment: )
           )
+# Comment: p.paragraph_format.space_after = Pt(8)
           p.paragraph_format.space_after = Pt(8)
+# Comment: add_divider(doc)
           add_divider(doc)
+# Comment: doc.add_page_break()
           doc.add_page_break()
+# Comment: if not all_results:
           if not all_results:
+# Comment: doc.add_paragraph('No Mule XML flow files were found or could be documented.')
               doc.add_paragraph('No Mule XML flow files were found or could be documented.')
+# Comment: else:
           else:
+# Comment: for fname, blocks in all_results:
               for fname, blocks in all_results:
+# Comment: doc.add_heading(f'File: {fname}', level=1)
                   doc.add_heading(f'File: {fname}', level=1)
+# Comment: if not blocks:
                   if not blocks:
+# Comment: doc.add_paragraph(
                       doc.add_paragraph(
+# Comment: 'This file contains Mule global configurations only - no flows defined.'
                           'This file contains Mule global configurations only - no flows defined.'
+# Comment: ).italic = True
                       ).italic = True
+# Comment: add_divider(doc)
                       add_divider(doc)
+# Comment: doc.add_paragraph()
                       doc.add_paragraph()
+# Comment: continue
                       continue
+# Comment: for block in blocks:
                   for block in blocks:
+# Comment: render_flow(doc, block, fname)
                       render_flow(doc, block, fname)
+# Comment: doc.add_page_break()
                       doc.add_page_break()
+# Comment: doc.save(DOC_NAME)
           doc.save(DOC_NAME)
+# Comment: print(f'Saved: {DOC_NAME}')
           print(f'Saved: {DOC_NAME}')
+# Comment: SCRIPTEOF
           SCRIPTEOF
+# Blank line
 
+# Comment: - name: Write Claude prompt file
       - name: Write Claude prompt file
+# Comment: run: |
         run: |
+# Comment: cat > /tmp/claude_prompt.txt << 'PROMPTEOF'
           cat > /tmp/claude_prompt.txt << 'PROMPTEOF'
+# Comment: You are a senior MuleSoft integration architect and technical writer.
           You are a senior MuleSoft integration architect and technical writer.
+# Comment: You will receive the raw XML content of a MuleSoft Mule 4 flow file.
           You will receive the raw XML content of a MuleSoft Mule 4 flow file.
+# Comment: Your task is to produce thorough, accurate, human-readable documentation for EVE
           Your task is to produce thorough, accurate, human-readable documentation for EVERY <mule:flow> and <mule:sub-flow> found in the XML.
+# Blank line
 
+# Comment: IMPORTANT: Read the XML carefully. Extract real values - real flow names, real p
           IMPORTANT: Read the XML carefully. Extract real values - real flow names, real paths, real DataWeave scripts, real connector names. Do not make up or guess anything.
+# Blank line
 
+# Comment: ===== OUTPUT FORMAT =====
           ===== OUTPUT FORMAT =====
+# Comment: For each flow write exactly this structure between the markers shown. No text ou
           For each flow write exactly this structure between the markers shown. No text outside the markers.
+# Blank line
 
+# Comment: @@FLOW_START@@
           @@FLOW_START@@
+# Comment: FLOW_NAME: <copy the exact name attribute from the mule:flow or mule:sub-flow el
           FLOW_NAME: <copy the exact name attribute from the mule:flow or mule:sub-flow element>
+# Comment: FLOW_TYPE: <write: flow   OR   sub-flow>
           FLOW_TYPE: <write: flow   OR   sub-flow>
+# Blank line
 
+# Comment: ##OVERVIEW##
           ##OVERVIEW##
+# Comment: Write 3 to 5 sentences in plain English describing:
           Write 3 to 5 sentences in plain English describing:
+# Comment: - What this flow does from start to finish
           - What this flow does from start to finish
+# Comment: - What triggers it
           - What triggers it
+# Comment: - What business problem it solves
           - What business problem it solves
+# Comment: - What the final result or output is
           - What the final result or output is
+# Comment: A business analyst with no technical background should be able to read this and 
           A business analyst with no technical background should be able to read this and understand the flow.
+# Blank line
 
+# Comment: ##FLOW DIAGRAM##
           ##FLOW DIAGRAM##
+# Comment: Write a Mermaid graph TD diagram showing the EXACT steps in this flow in order.
           Write a Mermaid graph TD diagram showing the EXACT steps in this flow in order.
+# Comment: Start with: graph TD
           Start with: graph TD
+# Comment: Rules:
           Rules:
+# Comment: - Every component in the XML must appear as a node
           - Every component in the XML must appear as a node
+# Comment: - Use A[label] for normal steps
           - Use A[label] for normal steps
+# Comment: - Use A{label} for Choice Router or decision points
           - Use A{label} for Choice Router or decision points  
+# Comment: - Use A([label]) for merge or end points
           - Use A([label]) for merge or end points
+# Comment: - Use --> for connections
           - Use --> for connections
+# Comment: - Use -->|condition text| for conditional branches
           - Use -->|condition text| for conditional branches
+# Comment: - For Scatter-Gather show each route as a separate branch that merges at the end
           - For Scatter-Gather show each route as a separate branch that merges at the end
+# Comment: - For Choice show each when/otherwise as a separate branch
           - For Choice show each when/otherwise as a separate branch
+# Comment: - For Try show inner steps with an error branch going to the error handler
           - For Try show inner steps with an error branch going to the error handler
+# Comment: - Node labels must be short: ComponentType: key-detail (max 50 chars)
           - Node labels must be short: ComponentType: key-detail (max 50 chars)
+# Comment: - Use only letters numbers and basic punctuation in node labels - no quotes or s
           - Use only letters numbers and basic punctuation in node labels - no quotes or special chars
+# Comment: Do NOT show a generic example - show the ACTUAL flow from the XML.
           Do NOT show a generic example - show the ACTUAL flow from the XML.
+# Blank line
 
+# Comment: ##TRIGGER##
           ##TRIGGER##
+# Comment: - Type: <HTTP Listener or Scheduler or File Listener or JMS Listener or VM Liste
           - Type: <HTTP Listener or Scheduler or File Listener or JMS Listener or VM Listener or None - read from XML>
+# Comment: - Path: <exact path value if HTTP Listener - read from XML>
           - Path: <exact path value if HTTP Listener - read from XML>
+# Comment: - Method: <allowed methods if HTTP - read from XML>
           - Method: <allowed methods if HTTP - read from XML>
+# Comment: - Schedule: <frequency and time unit if Scheduler - read from XML>
           - Schedule: <frequency and time unit if Scheduler - read from XML>
+# Comment: - Directory: <directory path if File Listener - read from XML>
           - Directory: <directory path if File Listener - read from XML>
+# Comment: - Watermark Mode: <watermark mode if File Listener - read from XML>
           - Watermark Mode: <watermark mode if File Listener - read from XML>
+# Comment: - Destination: <queue or topic name if JMS or VM - read from XML>
           - Destination: <queue or topic name if JMS or VM - read from XML>
+# Comment: - Config Ref: <exact config-ref attribute value - read from XML>
           - Config Ref: <exact config-ref attribute value - read from XML>
+# Blank line
 
+# Comment: ##INPUTS##
           ##INPUTS##
+# Comment: - <List each type of input this flow expects. For HTTP flows: describe the expec
           - <List each type of input this flow expects. For HTTP flows: describe the expected request body shape, any required query params, required headers. For scheduled flows: state there is no inbound payload. Be specific about data types and field names if you can infer them from the DataWeave scripts.>
+# Blank line
 
+# Comment: ##LOGIC STEPS##
           ##LOGIC STEPS##
+# Comment: Document EVERY component inside the flow in the order they appear in the XML.
           Document EVERY component inside the flow in the order they appear in the XML.
+# Comment: For each component write a step block exactly like this - do not skip any compon
           For each component write a step block exactly like this - do not skip any component:
+# Blank line
 
+# Comment: STEP 1: <Exact component type e.g. HTTP Listener, Logger, Set Variable, DataWeav
           STEP 1: <Exact component type e.g. HTTP Listener, Logger, Set Variable, DataWeave Transform, DB Select, HTTP Request, Object Store Retrieve, Choice Router, Scatter-Gather, Try Scope, Flow Reference>
+# Comment: Description: <Write 3 to 5 sentences in plain English explaining exactly what th
           Description: <Write 3 to 5 sentences in plain English explaining exactly what this step does.
+# Comment: State the business purpose clearly.
           State the business purpose clearly.
+# Comment: For HTTP Request: state the exact URL, method, and what data is being sent and w
           For HTTP Request: state the exact URL, method, and what data is being sent and what response is expected.
+# Comment: For DB operations: state the exact table name, what columns are used, what the S
           For DB operations: state the exact table name, what columns are used, what the SQL does, what data comes back.
+# Comment: For DataWeave Transform: describe exactly what the input data looks like and exa
           For DataWeave Transform: describe exactly what the input data looks like and exactly what the output data looks like after transformation.
+# Comment: For Logger: state exactly what is being logged and why.
           For Logger: state exactly what is being logged and why.
+# Comment: For Set Variable: state the variable name and what value it holds and why.
           For Set Variable: state the variable name and what value it holds and why.
+# Comment: For Choice Router: describe each condition and which path is taken for each cond
           For Choice Router: describe each condition and which path is taken for each condition.
+# Comment: For Scatter-Gather: describe each parallel route and what each one does independ
           For Scatter-Gather: describe each parallel route and what each one does independently.
+# Comment: For Try Scope: describe what is attempted and what happens if it fails.
           For Try Scope: describe what is attempted and what happens if it fails.
+# Comment: For Flow Reference: state which sub-flow is called and why.>
           For Flow Reference: state which sub-flow is called and why.>
+# Comment: DataWeave:
           DataWeave:
+# Comment: ```
           ```
+# Comment: <If this step contains a DataWeave script copy it here EXACTLY as written in the
           <If this step contains a DataWeave script copy it here EXACTLY as written in the XML - every line - do not change or summarize it. If there is no DataWeave script delete this DataWeave block entirely.>
+# Comment: ```
           ```
+# Blank line
 
+# Comment: <If this step is a Choice Router add a ROUTE block for EACH when and otherwise b
           <If this step is a Choice Router add a ROUTE block for EACH when and otherwise branch:>
+# Comment: ROUTE when <exact expression from XML>:
           ROUTE when <exact expression from XML>:
+# Comment: STEP A: <component inside this branch>
             STEP A: <component inside this branch>
+# Comment: Description: <description of this inner step>
             Description: <description of this inner step>
+# Comment: DataWeave:
             DataWeave:
+# Comment: ```
             ```
+# Comment: <script if any - verbatim>
             <script if any - verbatim>
+# Comment: ```
             ```
+# Comment: ROUTE otherwise:
           ROUTE otherwise:
+# Comment: STEP A: <component inside otherwise branch>
             STEP A: <component inside otherwise branch>
+# Comment: Description: <description>
             Description: <description>
+# Blank line
 
+# Comment: <If this step is a Scatter-Gather add a ROUTE block for EACH parallel route:>
           <If this step is a Scatter-Gather add a ROUTE block for EACH parallel route:>
+# Comment: ROUTE 1:
           ROUTE 1:
+# Comment: STEP A: <component>
             STEP A: <component>
+# Comment: Description: <description>
             Description: <description>
+# Comment: DataWeave:
             DataWeave:
+# Comment: ```
             ```
+# Comment: <script if any>
             <script if any>
+# Comment: ```
             ```
+# Comment: ROUTE 2:
           ROUTE 2:
+# Comment: STEP A: <component>
             STEP A: <component>
+# Comment: Description: <description>
             Description: <description>
+# Blank line
 
+# Comment: <If this step is a Try Scope add inner steps and error handler:>
           <If this step is a Try Scope add inner steps and error handler:>
+# Comment: ROUTE try:
           ROUTE try:
+# Comment: STEP A: <inner component>
             STEP A: <inner component>
+# Comment: Description: <description>
             Description: <description>
+# Comment: DataWeave:
             DataWeave:
+# Comment: ```
             ```
+# Comment: <script if any>
             <script if any>
+# Comment: ```
             ```
+# Comment: ROUTE error-handler:
           ROUTE error-handler:
+# Comment: STEP A: <on-error-continue or on-error-propagate>
             STEP A: <on-error-continue or on-error-propagate>
+# Comment: Description: <what happens on error>
             Description: <what happens on error>
+# Blank line
 
+# Comment: ##CONNECTORS USED##
           ##CONNECTORS USED##
+# Comment: | Connector | Operation | Config Ref | Key Details |
           | Connector | Operation | Config Ref | Key Details |
+# Comment: |-----------|-----------|------------|-------------|
           |-----------|-----------|------------|-------------|
+# Comment: <One row per unique connector or Mule component. Include HTTP, DB, Object Store,
           <One row per unique connector or Mule component. Include HTTP, DB, Object Store, File, JMS, VM, Salesforce, Logger, Set Payload, Set Variable, DataWeave, Scheduler, Flow Reference etc. Read config-ref and key attributes from the XML.>
+# Blank line
 
+# Comment: ##ERROR HANDLING##
           ##ERROR HANDLING##
+# Comment: - Strategy: <on-error-propagate or on-error-continue or None - read from XML>
           - Strategy: <on-error-propagate or on-error-continue or None - read from XML>
+# Comment: - Error Types Caught: <list error types from type attribute or write ANY or None
           - Error Types Caught: <list error types from type attribute or write ANY or None>
+# Comment: - Behaviour: <plain English: what exactly happens when an error occurs in this f
           - Behaviour: <plain English: what exactly happens when an error occurs in this flow>
+# Blank line
 
+# Comment: ##OUTPUTS##
           ##OUTPUTS##
+# Comment: - Payload: <describe exactly what the final payload contains after this flow com
           - Payload: <describe exactly what the final payload contains after this flow completes - data type, shape, fields>
+# Comment: - Variables Set: <list every variable name set via set-variable in this flow, or
           - Variables Set: <list every variable name set via set-variable in this flow, or write None>
+# Blank line
 
+# Comment: ##FLOW REFERENCES##
           ##FLOW REFERENCES##
+# Comment: <List every flow-ref name attribute found in this flow. Write None if there are 
           <List every flow-ref name attribute found in this flow. Write None if there are none.>
+# Blank line
 
+# Comment: ##CONFIGURATION PROPERTIES##
           ##CONFIGURATION PROPERTIES##
+# Comment: <List every ${property.name} placeholder found anywhere in this flow XML. Write 
           <List every ${property.name} placeholder found anywhere in this flow XML. Write None if there are none.>
+# Comment: @@FLOW_END@@
           @@FLOW_END@@
+# Blank line
 
+# Comment: ===== CRITICAL RULES =====
           ===== CRITICAL RULES =====
+# Comment: 1. Write one @@FLOW_START@@ to @@FLOW_END@@ block for EVERY flow and sub-flow - 
           1. Write one @@FLOW_START@@ to @@FLOW_END@@ block for EVERY flow and sub-flow - no exceptions.
+# Comment: 2. DataWeave scripts must be 100 percent complete and verbatim - copy every sing
           2. DataWeave scripts must be 100 percent complete and verbatim - copy every single line from the XML.
+# Comment: 3. The Mermaid diagram must show the ACTUAL flow structure from the XML - not a 
           3. The Mermaid diagram must show the ACTUAL flow structure from the XML - not a generic example.
+# Comment: 4. STEP numbers must be sequential integers: STEP 1, STEP 2, STEP 3 etc.
           4. STEP numbers must be sequential integers: STEP 1, STEP 2, STEP 3 etc.
+# Comment: 5. Every STEP must have a Description - never skip it.
           5. Every STEP must have a Description - never skip it.
+# Comment: 6. Read real values from the XML - never invent paths, table names, variable nam
           6. Read real values from the XML - never invent paths, table names, variable names or URLs.
+# Comment: 7. Write NOTHING outside the @@FLOW_START@@ and @@FLOW_END@@ markers.
           7. Write NOTHING outside the @@FLOW_START@@ and @@FLOW_END@@ markers.
+# Comment: PROMPTEOF
           PROMPTEOF
+# Blank line
 
+# Comment: - name: Run documentation generator
       - name: Run documentation generator
+# Comment: env:
         env:
+# Comment: ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+# Comment: EXTRACT_DIR: ${{ env.EXTRACT_DIR }}
           EXTRACT_DIR: ${{ env.EXTRACT_DIR }}
+# Comment: JAR_NAME: ${{ env.JAR_NAME }}
           JAR_NAME: ${{ env.JAR_NAME }}
+# Comment: run: python3 /tmp/generate_docs.py
         run: python3 /tmp/generate_docs.py
+# Blank line
 
+# Comment: - name: Commit documentation
       - name: Commit documentation
+# Comment: run: |
         run: |
+# Comment: JAR_BASE="${{ github.event.inputs.jar_file }}"
           JAR_BASE="${{ github.event.inputs.jar_file }}"
+# Comment: DOC_NAME="${JAR_BASE%.jar}-flow-documentation.docx"
           DOC_NAME="${JAR_BASE%.jar}-flow-documentation.docx"
+# Blank line
 
+# Comment: # Set git identity
           # Set git identity
+# Comment: git config user.name "github-actions[bot]"
           git config user.name "github-actions[bot]"
+# Comment: git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+# Blank line
 
+# Comment: # Set remote URL with PAT so push is always authenticated
           # Set remote URL with PAT so push is always authenticated
+# Comment: git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+# Blank line
 
+# Comment: # Pull latest master to stay in sync
           # Pull latest master to stay in sync
+# Comment: git pull origin master --rebase
           git pull origin master --rebase
+# Blank line
 
+# Comment: # Stage only the doc file — skip binary cache files
           # Stage only the doc file — skip binary cache files
+# Comment: git add "$DOC_NAME" || true
           git add "$DOC_NAME" || true
+# Blank line
 
+# Comment: # Commit only if there are staged changes
           # Commit only if there are staged changes
+# Comment: if git diff --cached --quiet; then
           if git diff --cached --quiet; then
+# Comment: echo "No changes to commit — documentation is already up to date."
             echo "No changes to commit — documentation is already up to date."
+# Comment: else
           else
+# Comment: git commit -m "docs: Claude-generated flow documentation for ${{ github.event.in
             git commit -m "docs: Claude-generated flow documentation for ${{ github.event.inputs.jar_file }}"
+# Comment: git push origin HEAD:master
             git push origin HEAD:master
+# Comment: echo "Successfully pushed to master"
             echo "Successfully pushed to master"
+# Comment: fi
           fi
