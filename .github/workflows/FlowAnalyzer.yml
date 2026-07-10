@@ -1,1110 +1,2220 @@
+# Comment: name: MuleSoft JAR Documentation Generator
 name: MuleSoft JAR Documentation Generator
+# Blank line
 
+# Comment: on:
 on:
+# Comment: workflow_dispatch:
   workflow_dispatch:
+# Comment: inputs:
     inputs:
+# Comment: jar_file:
       jar_file:
+# Comment: description: 'JAR file name (e.g. hellomule.jar)'
         description: 'JAR file name (e.g. hellomule.jar)'
+# Comment: required: true
         required: true
+# Comment: type: string
         type: string
+# Blank line
 
+# Comment: permissions:
 permissions:
+# Comment: contents: write
   contents: write
+# Blank line
 
+# Comment: jobs:
 jobs:
+# Comment: generate-docs:
   generate-docs:
+# Comment: runs-on: ubuntu-latest
     runs-on: ubuntu-latest
+# Comment: steps:
     steps:
+# Comment: - name: Checkout repo
       - name: Checkout repo
+# Comment: uses: actions/checkout@v3
         uses: actions/checkout@v3
+# Blank line
 
+# Comment: - name: Validate JAR exists
       - name: Validate JAR exists
+# Comment: run: |
         run: |
+# Comment: if [ ! -f "${{ github.event.inputs.jar_file }}" ]; then
           if [ ! -f "${{ github.event.inputs.jar_file }}" ]; then
+# Comment: echo "ERROR: JAR file '${{ github.event.inputs.jar_file }}' not found in repo ro
             echo "ERROR: JAR file '${{ github.event.inputs.jar_file }}' not found in repo root."
+# Comment: exit 1
             exit 1
+# Comment: fi
           fi
+# Comment: echo "JAR found: ${{ github.event.inputs.jar_file }}"
           echo "JAR found: ${{ github.event.inputs.jar_file }}"
+# Blank line
 
+# Comment: - name: Extract JAR
       - name: Extract JAR
+# Comment: run: |
         run: |
+# Comment: JAR_NAME="${{ github.event.inputs.jar_file }}"
           JAR_NAME="${{ github.event.inputs.jar_file }}"
+# Comment: EXTRACT_DIR="extracted_${JAR_NAME%.jar}"
           EXTRACT_DIR="extracted_${JAR_NAME%.jar}"
+# Comment: mkdir -p "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
+# Comment: unzip -o "$JAR_NAME" -d "$EXTRACT_DIR/"
           unzip -o "$JAR_NAME" -d "$EXTRACT_DIR/"
+# Comment: echo "EXTRACT_DIR=$EXTRACT_DIR" >> $GITHUB_ENV
           echo "EXTRACT_DIR=$EXTRACT_DIR" >> $GITHUB_ENV
+# Comment: echo "JAR_NAME=$JAR_NAME"       >> $GITHUB_ENV
           echo "JAR_NAME=$JAR_NAME"       >> $GITHUB_ENV
+# Blank line
 
+# Comment: - name: List all extracted files
       - name: List all extracted files
+# Comment: run: |
         run: |
+# Comment: echo "=== All extracted files ==="
           echo "=== All extracted files ==="
+# Comment: find "$EXTRACT_DIR" | sort
           find "$EXTRACT_DIR" | sort
+# Comment: echo ""
           echo ""
+# Comment: echo "=== Mule XML files (containing <mule) ==="
           echo "=== Mule XML files (containing <mule) ==="
+# Comment: find "$EXTRACT_DIR" -name "*.xml" | xargs grep -l "<mule" 2>/dev/null | sort || 
           find "$EXTRACT_DIR" -name "*.xml" | xargs grep -l "<mule" 2>/dev/null | sort || echo "None found"
+# Blank line
 
+# Comment: - name: Install Python dependencies
       - name: Install Python dependencies
+# Comment: run: pip install python-docx
         run: pip install python-docx
+# Blank line
 
+# Comment: - name: Generate Word Documentation
       - name: Generate Word Documentation
+# Comment: run: |
         run: |
+# Comment: python3 << 'PYEOF'
           python3 << 'PYEOF'
+# Comment: import os, re, xml.etree.ElementTree as ET
           import os, re, xml.etree.ElementTree as ET
+# Comment: from datetime import date
           from datetime import date
+# Comment: from docx import Document
           from docx import Document
+# Comment: from docx.shared import Pt, RGBColor, Inches
           from docx.shared import Pt, RGBColor, Inches
+# Comment: from docx.enum.text import WD_ALIGN_PARAGRAPH
           from docx.enum.text import WD_ALIGN_PARAGRAPH
+# Comment: from docx.oxml.ns import qn
           from docx.oxml.ns import qn
+# Comment: from docx.oxml import OxmlElement
           from docx.oxml import OxmlElement
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # ENVIRONMENT
           # ENVIRONMENT
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: EXTRACT_DIR = os.environ.get('EXTRACT_DIR', 'extracted')
           EXTRACT_DIR = os.environ.get('EXTRACT_DIR', 'extracted')
+# Comment: JAR_NAME    = os.environ.get('JAR_NAME', 'unknown.jar')
           JAR_NAME    = os.environ.get('JAR_NAME', 'unknown.jar')
+# Comment: TODAY       = date.today().isoformat()
           TODAY       = date.today().isoformat()
+# Comment: GITHUB_REF  = os.environ.get('GITHUB_REF_NAME', 'N/A')
           GITHUB_REF  = os.environ.get('GITHUB_REF_NAME', 'N/A')
+# Comment: GITHUB_SHA  = os.environ.get('GITHUB_SHA', 'N/A')[:8]
           GITHUB_SHA  = os.environ.get('GITHUB_SHA', 'N/A')[:8]
+# Comment: DOC_NAME    = JAR_NAME.replace('.jar', '') + '-flow-documentation.docx'
           DOC_NAME    = JAR_NAME.replace('.jar', '') + '-flow-documentation.docx'
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # NAMESPACE REGISTRY
           # NAMESPACE REGISTRY
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: KNOWN_NS = {
           KNOWN_NS = {
+# Comment: 'http://www.mulesoft.org/schema/mule/core':              'mule',
               'http://www.mulesoft.org/schema/mule/core':              'mule',
+# Comment: 'http://www.mulesoft.org/schema/mule/http':              'http',
               'http://www.mulesoft.org/schema/mule/http':              'http',
+# Comment: 'http://www.mulesoft.org/schema/mule/db':                'db',
               'http://www.mulesoft.org/schema/mule/db':                'db',
+# Comment: 'http://www.mulesoft.org/schema/mule/ee/core':           'ee',
               'http://www.mulesoft.org/schema/mule/ee/core':           'ee',
+# Comment: 'http://www.mulesoft.org/schema/mule/os':                'os',
               'http://www.mulesoft.org/schema/mule/os':                'os',
+# Comment: 'http://www.mulesoft.org/schema/mule/file':              'file',
               'http://www.mulesoft.org/schema/mule/file':              'file',
+# Comment: 'http://www.mulesoft.org/schema/mule/salesforce':        'salesforce',
               'http://www.mulesoft.org/schema/mule/salesforce':        'salesforce',
+# Comment: 'http://www.mulesoft.org/schema/mule/jms':               'jms',
               'http://www.mulesoft.org/schema/mule/jms':               'jms',
+# Comment: 'http://www.mulesoft.org/schema/mule/vm':                'vm',
               'http://www.mulesoft.org/schema/mule/vm':                'vm',
+# Comment: 'http://www.mulesoft.org/schema/mule/ftp':               'ftp',
               'http://www.mulesoft.org/schema/mule/ftp':               'ftp',
+# Comment: 'http://www.mulesoft.org/schema/mule/sftp':              'sftp',
               'http://www.mulesoft.org/schema/mule/sftp':              'sftp',
+# Comment: 'http://www.mulesoft.org/schema/mule/email':             'email',
               'http://www.mulesoft.org/schema/mule/email':             'email',
+# Comment: 'http://www.mulesoft.org/schema/mule/sockets':           'sockets',
               'http://www.mulesoft.org/schema/mule/sockets':           'sockets',
+# Comment: 'http://www.mulesoft.org/schema/mule/validation':        'validation',
               'http://www.mulesoft.org/schema/mule/validation':        'validation',
+# Comment: 'http://www.mulesoft.org/schema/mule/aggregators':       'aggregators',
               'http://www.mulesoft.org/schema/mule/aggregators':       'aggregators',
+# Comment: 'http://www.mulesoft.org/schema/mule/batch':             'batch',
               'http://www.mulesoft.org/schema/mule/batch':             'batch',
+# Comment: 'http://www.mulesoft.org/schema/mule/compression':       'compression',
               'http://www.mulesoft.org/schema/mule/compression':       'compression',
+# Comment: 'http://www.mulesoft.org/schema/mule/crypto':            'crypto',
               'http://www.mulesoft.org/schema/mule/crypto':            'crypto',
+# Comment: }
           }
+# Blank line
 
+# Comment: MULE_CORE_NS = 'http://www.mulesoft.org/schema/mule/core'
           MULE_CORE_NS = 'http://www.mulesoft.org/schema/mule/core'
+# Comment: EE_NS        = 'http://www.mulesoft.org/schema/mule/ee/core'
           EE_NS        = 'http://www.mulesoft.org/schema/mule/ee/core'
+# Blank line
 
+# Comment: NOISE_TAGS = {
           NOISE_TAGS = {
+# Comment: 'bulk-input-parameters','sql','input-parameters','default-value',
               'bulk-input-parameters','sql','input-parameters','default-value',
+# Comment: 'value','query-params','response-validator','success-status-code-validator',
               'value','query-params','response-validator','success-status-code-validator',
+# Comment: 'request-connection','listener-connection','scheduling-strategy',
               'request-connection','listener-connection','scheduling-strategy',
+# Comment: 'fixed-frequency','cron','message','variables','body','headers',
               'fixed-frequency','cron','message','variables','body','headers',
+# Comment: 'uri-params','correlation-id','success-response','failure-response',
               'uri-params','correlation-id','success-response','failure-response',
+# Comment: 'reconnect','reconnect-forever','pooling-profile','connection','parameters',
               'reconnect','reconnect-forever','pooling-profile','connection','parameters',
+# Comment: 'reconnection','expiration-policy','redelivery-policy',
               'reconnection','expiration-policy','redelivery-policy',
+# Comment: }
           }
+# Blank line
 
+# Comment: NON_MULE_FILENAMES = {
           NON_MULE_FILENAMES = {
+# Comment: 'pom.xml','log4j2.xml','log4j.xml','application-types.xml',
               'pom.xml','log4j2.xml','log4j.xml','application-types.xml',
+# Comment: 'beans.xml','web.xml','context.xml','persistence.xml',
               'beans.xml','web.xml','context.xml','persistence.xml',
+# Comment: }
           }
+# Blank line
 
+# Comment: SKIP_DIRS = {
           SKIP_DIRS = {
+# Comment: '.mule','.settings','cache','offheap-disk-store',
               '.mule','.settings','cache','offheap-disk-store',
+# Comment: 'test','munit','java','api','wsdl','xsd','repository',
               'test','munit','java','api','wsdl','xsd','repository',
+# Comment: }
           }
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # COLOR CONSTANTS
           # COLOR CONSTANTS
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: BLUE_DARK  = RGBColor(0x1F, 0x49, 0x7D)
           BLUE_DARK  = RGBColor(0x1F, 0x49, 0x7D)
+# Comment: BLUE_MID   = RGBColor(0x2E, 0x75, 0xB6)
           BLUE_MID   = RGBColor(0x2E, 0x75, 0xB6)
+# Comment: BLUE_LIGHT = RGBColor(0x44, 0x72, 0xC4)
           BLUE_LIGHT = RGBColor(0x44, 0x72, 0xC4)
+# Comment: WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
           WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
+# Comment: GREY       = RGBColor(0x44, 0x44, 0x44)
           GREY       = RGBColor(0x44, 0x44, 0x44)
+# Comment: GREEN_DARK = RGBColor(0x1E, 0x6B, 0x3A)
           GREEN_DARK = RGBColor(0x1E, 0x6B, 0x3A)
+# Comment: BLACK      = RGBColor(0x00, 0x00, 0x00)
           BLACK      = RGBColor(0x00, 0x00, 0x00)
+# Comment: CODE_FG    = RGBColor(0x1A, 0x1A, 0x1A)
           CODE_FG    = RGBColor(0x1A, 0x1A, 0x1A)
+# Comment: ERR_RED    = RGBColor(0xC0, 0x30, 0x30)
           ERR_RED    = RGBColor(0xC0, 0x30, 0x30)
+# Comment: CODE_BG    = 'F2F2F2'
           CODE_BG    = 'F2F2F2'
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # SAFE COLOR SETTER  ← fixes the AttributeError
           # SAFE COLOR SETTER  ← fixes the AttributeError
+# Comment: # python-docx's font.color returns a ColorFormat object whose
           # python-docx's font.color returns a ColorFormat object whose
+# Comment: # .rgb property setter is not always available depending on the
           # .rgb property setter is not always available depending on the
+# Comment: # internal state.  Setting via XML is version-proof.
           # internal state.  Setting via XML is version-proof.
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def set_font_color(run, rgb_color):
           def set_font_color(run, rgb_color):
+# Comment: """Set run font color safely via XML (avoids 'no setter' error)."""
               """Set run font color safely via XML (avoids 'no setter' error)."""
+# Comment: rPr = run._r.get_or_add_rPr()
               rPr = run._r.get_or_add_rPr()
+# Comment: # Remove any existing <w:color> element
               # Remove any existing <w:color> element
+# Comment: for old in rPr.findall(qn('w:color')):
               for old in rPr.findall(qn('w:color')):
+# Comment: rPr.remove(old)
                   rPr.remove(old)
+# Comment: color_el = OxmlElement('w:color')
               color_el = OxmlElement('w:color')
+# Comment: hex_val  = '{:02X}{:02X}{:02X}'.format(
               hex_val  = '{:02X}{:02X}{:02X}'.format(
+# Comment: rgb_color[0], rgb_color[1], rgb_color[2]
                   rgb_color[0], rgb_color[1], rgb_color[2]
+# Comment: )
               )
+# Comment: color_el.set(qn('w:val'), hex_val)
               color_el.set(qn('w:val'), hex_val)
+# Comment: rPr.append(color_el)
               rPr.append(color_el)
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # HELPERS
           # HELPERS
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def get_tag(el):
           def get_tag(el):
+# Comment: return el.tag.split('}')[-1] if '}' in el.tag else el.tag
               return el.tag.split('}')[-1] if '}' in el.tag else el.tag
+# Blank line
 
+# Comment: def get_ns_uri(el):
           def get_ns_uri(el):
+# Comment: return el.tag.split('}')[0].strip('{') if '}' in el.tag else ''
               return el.tag.split('}')[0].strip('{') if '}' in el.tag else ''
+# Blank line
 
+# Comment: def get_prefix(el):
           def get_prefix(el):
+# Comment: uri = get_ns_uri(el)
               uri = get_ns_uri(el)
+# Comment: if uri in KNOWN_NS:
               if uri in KNOWN_NS:
+# Comment: return KNOWN_NS[uri]
                   return KNOWN_NS[uri]
+# Comment: if uri:
               if uri:
+# Comment: short = uri.rstrip('/').split('/')[-1]
                   short = uri.rstrip('/').split('/')[-1]
+# Comment: KNOWN_NS[uri] = short
                   KNOWN_NS[uri] = short
+# Comment: return short
                   return short
+# Comment: return 'mule'
               return 'mule'
+# Blank line
 
+# Comment: def is_mule_file(path):
           def is_mule_file(path):
+# Comment: fname = os.path.basename(path)
               fname = os.path.basename(path)
+# Comment: if fname in NON_MULE_FILENAMES:
               if fname in NON_MULE_FILENAMES:
+# Comment: return False
                   return False
+# Comment: try:
               try:
+# Comment: tree = ET.parse(path)
                   tree = ET.parse(path)
+# Comment: root = tree.getroot()
                   root = tree.getroot()
+# Comment: ns   = get_ns_uri(root)
                   ns   = get_ns_uri(root)
+# Comment: return MULE_CORE_NS in ns or 'mulesoft.org/schema/mule' in ns
                   return MULE_CORE_NS in ns or 'mulesoft.org/schema/mule' in ns
+# Comment: except:
               except:
+# Comment: return False
                   return False
+# Blank line
 
+# Comment: def safe(val, default='—'):
           def safe(val, default='—'):
+# Comment: return str(val).strip() if val and str(val).strip() else default
               return str(val).strip() if val and str(val).strip() else default
+# Blank line
 
+# Comment: def clean_mermaid(text):
           def clean_mermaid(text):
+# Comment: text = str(text)
               text = str(text)
+# Comment: text = re.sub(r'["\[\]{}|<>]', '', text)
               text = re.sub(r'["\[\]{}|<>]', '', text)
+# Comment: text = re.sub(r'\s+', ' ', text).strip()
               text = re.sub(r'\s+', ' ', text).strip()
+# Comment: return text[:55] + ('...' if len(text) > 55 else '')
               return text[:55] + ('...' if len(text) > 55 else '')
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # STEP DESCRIPTION
           # STEP DESCRIPTION
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def describe_element(el):
           def describe_element(el):
+# Comment: tag    = get_tag(el)
               tag    = get_tag(el)
+# Comment: prefix = get_prefix(el)
               prefix = get_prefix(el)
+# Comment: a      = el.attrib
               a      = el.attrib
+# Blank line
 
+# Comment: if tag == 'logger':
               if tag == 'logger':
+# Comment: msg = a.get('message','')
                   msg = a.get('message','')
+# Comment: lvl = a.get('level','INFO')
                   lvl = a.get('level','INFO')
+# Comment: return f"Logger ({lvl})", f"Logs: {msg[:60]}{'...' if len(msg)>60 else ''}"
                   return f"Logger ({lvl})", f"Logs: {msg[:60]}{'...' if len(msg)>60 else ''}"
+# Comment: if tag == 'set-payload':
               if tag == 'set-payload':
+# Comment: val = a.get('value','')
                   val = a.get('value','')
+# Comment: return "Set Payload", f"Sets payload to: {val[:60] if val else '(see DataWeave)'
                   return "Set Payload", f"Sets payload to: {val[:60] if val else '(see DataWeave)'}"
+# Comment: if tag == 'set-variable':
               if tag == 'set-variable':
+# Comment: return "Set Variable", f"Sets vars.{a.get('variableName','?')} = {str(a.get('val
                   return "Set Variable", f"Sets vars.{a.get('variableName','?')} = {str(a.get('value',''))[:50]}"
+# Comment: if tag in ('transform',) and prefix == 'ee':
               if tag in ('transform',) and prefix == 'ee':
+# Comment: return "DataWeave Transform", "Transforms message payload / variables (see DataW
                   return "DataWeave Transform", "Transforms message payload / variables (see DataWeave below)"
+# Comment: if tag == 'scatter-gather':
               if tag == 'scatter-gather':
+# Comment: return "Scatter-Gather", "Executes multiple routes in parallel and merges all re
                   return "Scatter-Gather", "Executes multiple routes in parallel and merges all results"
+# Comment: if tag == 'choice':
               if tag == 'choice':
+# Comment: return "Choice Router", "Routes message to different paths based on condition"
                   return "Choice Router", "Routes message to different paths based on condition"
+# Comment: if tag == 'try':
               if tag == 'try':
+# Comment: return "Try Scope", "Wraps steps with isolated error handling"
                   return "Try Scope", "Wraps steps with isolated error handling"
+# Comment: if tag == 'error-handler':
               if tag == 'error-handler':
+# Comment: return "Error Handler", "Handles errors thrown within this scope"
                   return "Error Handler", "Handles errors thrown within this scope"
+# Comment: if tag == 'on-error-propagate':
               if tag == 'on-error-propagate':
+# Comment: return "On Error Propagate", f"Propagates error (type: {a.get('type','ANY')})"
                   return "On Error Propagate", f"Propagates error (type: {a.get('type','ANY')})"
+# Comment: if tag == 'on-error-continue':
               if tag == 'on-error-continue':
+# Comment: return "On Error Continue", f"Swallows error and continues (type: {a.get('type',
                   return "On Error Continue", f"Swallows error and continues (type: {a.get('type','ANY')})"
+# Comment: if tag == 'flow-ref':
               if tag == 'flow-ref':
+# Comment: return "Flow Reference", f"Calls sub-flow: {a.get('name','?')}"
                   return "Flow Reference", f"Calls sub-flow: {a.get('name','?')}"
+# Comment: if tag == 'scheduler':
               if tag == 'scheduler':
+# Comment: return "Scheduler", "Triggers flow on a time-based schedule"
                   return "Scheduler", "Triggers flow on a time-based schedule"
+# Comment: if tag == 'async':
               if tag == 'async':
+# Comment: return "Async Scope", "Executes inner processors asynchronously"
                   return "Async Scope", "Executes inner processors asynchronously"
+# Comment: if tag == 'foreach':
               if tag == 'foreach':
+# Comment: return "For Each", f"Iterates over collection: {a.get('collection','payload')}"
                   return "For Each", f"Iterates over collection: {a.get('collection','payload')}"
+# Comment: if tag == 'parallel-foreach':
               if tag == 'parallel-foreach':
+# Comment: return "Parallel For Each", f"Iterates in parallel over: {a.get('collection','pa
                   return "Parallel For Each", f"Iterates in parallel over: {a.get('collection','payload')}"
+# Comment: if tag == 'until-successful':
               if tag == 'until-successful':
+# Comment: return "Until Successful", f"Retries until success (max {a.get('maxRetries','?')
                   return "Until Successful", f"Retries until success (max {a.get('maxRetries','?')} retries)"
+# Comment: if tag == 'first-successful':
               if tag == 'first-successful':
+# Comment: return "First Successful", "Tries routes until one succeeds"
                   return "First Successful", "Tries routes until one succeeds"
+# Comment: if tag == 'round-robin':
               if tag == 'round-robin':
+# Comment: return "Round Robin", "Distributes messages across routes in order"
                   return "Round Robin", "Distributes messages across routes in order"
+# Comment: if prefix == 'http' and tag == 'listener':
               if prefix == 'http' and tag == 'listener':
+# Comment: return "HTTP Listener", f"Receives {a.get('allowedMethods','ANY')} requests at '
                   return "HTTP Listener", f"Receives {a.get('allowedMethods','ANY')} requests at '{a.get('path','?')}'"
+# Comment: if prefix == 'http' and tag == 'request':
               if prefix == 'http' and tag == 'request':
+# Comment: return "HTTP Request", f"{a.get('method','GET')} → {a.get('url', a.get('path','?
                   return "HTTP Request", f"{a.get('method','GET')} → {a.get('url', a.get('path','?'))}"
+# Comment: if prefix == 'db':
               if prefix == 'db':
+# Comment: op_map = {
                   op_map = {
+# Comment: 'select':'Select — queries records',
                       'select':'Select — queries records',
+# Comment: 'insert':'Insert — inserts a record',
                       'insert':'Insert — inserts a record',
+# Comment: 'update':'Update — updates records',
                       'update':'Update — updates records',
+# Comment: 'delete':'Delete — deletes records',
                       'delete':'Delete — deletes records',
+# Comment: 'bulk-insert':'Bulk Insert — inserts multiple records',
                       'bulk-insert':'Bulk Insert — inserts multiple records',
+# Comment: 'bulk-update':'Bulk Update — updates multiple records',
                       'bulk-update':'Bulk Update — updates multiple records',
+# Comment: 'stored-procedure':'Stored Procedure — executes DB procedure',
                       'stored-procedure':'Stored Procedure — executes DB procedure',
+# Comment: }
                   }
+# Comment: return f"DB {tag.replace('-',' ').title()}", op_map.get(tag, tag) + f" (config: 
                   return f"DB {tag.replace('-',' ').title()}", op_map.get(tag, tag) + f" (config: {a.get('config-ref','?')})"
+# Comment: if prefix == 'os':
               if prefix == 'os':
+# Comment: op_map = {
                   op_map = {
+# Comment: 'retrieve': f"Reads key '{a.get('key','?')}' → stores in vars.{a.get('target','?
                       'retrieve': f"Reads key '{a.get('key','?')}' → stores in vars.{a.get('target','?')}",
+# Comment: 'store':    f"Saves value under key '{a.get('key','?')}'",
                       'store':    f"Saves value under key '{a.get('key','?')}'",
+# Comment: 'remove':   f"Deletes key '{a.get('key','?')}'",
                       'remove':   f"Deletes key '{a.get('key','?')}'",
+# Comment: 'contains': f"Checks if key '{a.get('key','?')}' exists",
                       'contains': f"Checks if key '{a.get('key','?')}' exists",
+# Comment: }
                   }
+# Comment: return f"Object Store {tag.title()}", op_map.get(tag, tag)
                   return f"Object Store {tag.title()}", op_map.get(tag, tag)
+# Comment: if prefix in ('file','ftp','sftp'):
               if prefix in ('file','ftp','sftp'):
+# Comment: op_map = {
                   op_map = {
+# Comment: 'listener': f"Watches '{a.get('directory','?')}' for new/updated files",
                       'listener': f"Watches '{a.get('directory','?')}' for new/updated files",
+# Comment: 'read':     f"Reads file at '{a.get('path','?')}'",
                       'read':     f"Reads file at '{a.get('path','?')}'",
+# Comment: 'write':    f"Writes to '{a.get('path','?')}'",
                       'write':    f"Writes to '{a.get('path','?')}'",
+# Comment: 'copy':     f"Copies '{a.get('sourcePath','?')}' → '{a.get('targetPath','?')}'",
                       'copy':     f"Copies '{a.get('sourcePath','?')}' → '{a.get('targetPath','?')}'",
+# Comment: 'move':     f"Moves '{a.get('sourcePath','?')}' → '{a.get('targetPath','?')}'",
                       'move':     f"Moves '{a.get('sourcePath','?')}' → '{a.get('targetPath','?')}'",
+# Comment: 'delete':   f"Deletes '{a.get('path','?')}'",
                       'delete':   f"Deletes '{a.get('path','?')}'",
+# Comment: 'list':     f"Lists files in '{a.get('directoryPath','?')}'",
                       'list':     f"Lists files in '{a.get('directoryPath','?')}'",
+# Comment: }
                   }
+# Comment: return f"{prefix.upper()} {tag.title()}", op_map.get(tag, tag)
                   return f"{prefix.upper()} {tag.title()}", op_map.get(tag, tag)
+# Comment: if prefix in ('jms','vm'):
               if prefix in ('jms','vm'):
+# Comment: op_map = {
                   op_map = {
+# Comment: 'listener':  f"Subscribes to '{a.get('destination', a.get('queueName','?'))}'",
                       'listener':  f"Subscribes to '{a.get('destination', a.get('queueName','?'))}'",
+# Comment: 'publish':   f"Sends message to '{a.get('destination', a.get('queueName','?'))}'
                       'publish':   f"Sends message to '{a.get('destination', a.get('queueName','?'))}'",
+# Comment: 'consume':   f"Consumes from '{a.get('destination', a.get('queueName','?'))}'",
                       'consume':   f"Consumes from '{a.get('destination', a.get('queueName','?'))}'",
+# Comment: }
                   }
+# Comment: return f"{prefix.upper()} {tag.title()}", op_map.get(tag, tag)
                   return f"{prefix.upper()} {tag.title()}", op_map.get(tag, tag)
+# Comment: if prefix == 'salesforce':
               if prefix == 'salesforce':
+# Comment: return f"Salesforce {tag.replace('-',' ').title()}", f"Object type: {a.get('type
                   return f"Salesforce {tag.replace('-',' ').title()}", f"Object type: {a.get('type', a.get('sObjectType','?'))}"
+# Comment: if prefix == 'email':
               if prefix == 'email':
+# Comment: return f"Email {tag.title()}", f"Via config: {a.get('config-ref','?')}"
                   return f"Email {tag.title()}", f"Via config: {a.get('config-ref','?')}"
+# Comment: cfg = a.get('config-ref','')
               cfg = a.get('config-ref','')
+# Comment: return f"{prefix}:{tag}", f"Config: {cfg}" if cfg else ''
               return f"{prefix}:{tag}", f"Config: {cfg}" if cfg else ''
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # DATAWEAVE EXTRACTOR
           # DATAWEAVE EXTRACTOR
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def get_dw_for_element(el):
           def get_dw_for_element(el):
+# Comment: scripts = []
               scripts = []
+# Comment: seen    = set()
               seen    = set()
+# Comment: tag     = get_tag(el)
               tag     = get_tag(el)
+# Comment: prefix  = get_prefix(el)
               prefix  = get_prefix(el)
+# Blank line
 
+# Comment: def add(label, script):
               def add(label, script):
+# Comment: s = script.strip()
                   s = script.strip()
+# Comment: if s and s not in seen:
                   if s and s not in seen:
+# Comment: seen.add(s)
                       seen.add(s)
+# Comment: scripts.append((label, s))
                       scripts.append((label, s))
+# Blank line
 
+# Comment: if tag == 'transform' and prefix == 'ee':
               if tag == 'transform' and prefix == 'ee':
+# Comment: for child in el.iter():
                   for child in el.iter():
+# Comment: ctag = get_tag(child)
                       ctag = get_tag(child)
+# Comment: cns  = get_ns_uri(child)
                       cns  = get_ns_uri(child)
+# Comment: if cns == EE_NS and ctag == 'set-payload' and child.text:
                       if cns == EE_NS and ctag == 'set-payload' and child.text:
+# Comment: add('Output — payload', child.text)
                           add('Output — payload', child.text)
+# Comment: if cns == EE_NS and ctag == 'set-variable' and child.text:
                       if cns == EE_NS and ctag == 'set-variable' and child.text:
+# Comment: vname = child.attrib.get('variableName','?')
                           vname = child.attrib.get('variableName','?')
+# Comment: add(f'Output — variable "{vname}"', child.text)
                           add(f'Output — variable "{vname}"', child.text)
+# Blank line
 
+# Comment: if tag == 'set-payload':
               if tag == 'set-payload':
+# Comment: val = el.attrib.get('value','')
                   val = el.attrib.get('value','')
+# Comment: if val.startswith('#['):
                   if val.startswith('#['):
+# Comment: add('Inline expression', val)
                       add('Inline expression', val)
+# Comment: if el.text and el.text.strip():
                   if el.text and el.text.strip():
+# Comment: add('Body', el.text)
                       add('Body', el.text)
+# Blank line
 
+# Comment: if tag == 'logger':
               if tag == 'logger':
+# Comment: msg = el.attrib.get('message','')
                   msg = el.attrib.get('message','')
+# Comment: if msg.startswith('#[') and len(msg) > 5:
                   if msg.startswith('#[') and len(msg) > 5:
+# Comment: add('Inline expression', msg)
                       add('Inline expression', msg)
+# Blank line
 
+# Comment: if prefix == 'db':
               if prefix == 'db':
+# Comment: for child in el:
                   for child in el:
+# Comment: ctag = get_tag(child)
                       ctag = get_tag(child)
+# Comment: if ctag == 'sql' and child.text:
                       if ctag == 'sql' and child.text:
+# Comment: add('SQL Query', child.text)
                           add('SQL Query', child.text)
+# Comment: if ctag in ('input-parameters','bulk-input-parameters') and child.text:
                       if ctag in ('input-parameters','bulk-input-parameters') and child.text:
+# Comment: add(f'{ctag}', child.text)
                           add(f'{ctag}', child.text)
+# Blank line
 
+# Comment: if prefix == 'os':
               if prefix == 'os':
+# Comment: for child in el:
                   for child in el:
+# Comment: ctag = get_tag(child)
                       ctag = get_tag(child)
+# Comment: if ctag in ('value','default-value') and child.text:
                       if ctag in ('value','default-value') and child.text:
+# Comment: add(ctag, child.text)
                           add(ctag, child.text)
+# Blank line
 
+# Comment: if prefix == 'http' and tag == 'request':
               if prefix == 'http' and tag == 'request':
+# Comment: for child in el.iter():
                   for child in el.iter():
+# Comment: ctag = get_tag(child)
                       ctag = get_tag(child)
+# Comment: if ctag in ('query-params','body','headers') and child.text:
                       if ctag in ('query-params','body','headers') and child.text:
+# Comment: add(ctag, child.text)
                           add(ctag, child.text)
+# Blank line
 
+# Comment: return scripts
               return scripts
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # MERMAID DIAGRAM
           # MERMAID DIAGRAM
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: _node_id = [0]
           _node_id = [0]
+# Blank line
 
+# Comment: def nid():
           def nid():
+# Comment: _node_id[0] += 1
               _node_id[0] += 1
+# Comment: return f"N{_node_id[0]}"
               return f"N{_node_id[0]}"
+# Blank line
 
+# Comment: def build_mermaid(flow_el):
           def build_mermaid(flow_el):
+# Comment: _node_id[0] = 0
               _node_id[0] = 0
+# Comment: lines = ['graph TD']
               lines = ['graph TD']
+# Blank line
 
+# Comment: def process_children(children, prev_id):
               def process_children(children, prev_id):
+# Comment: last = prev_id
                   last = prev_id
+# Comment: for el in children:
                   for el in children:
+# Comment: tag    = get_tag(el)
                       tag    = get_tag(el)
+# Comment: prefix = get_prefix(el)
                       prefix = get_prefix(el)
+# Comment: if tag in NOISE_TAGS:
                       if tag in NOISE_TAGS:
+# Comment: continue
                           continue
+# Blank line
 
+# Comment: n = nid()
                       n = nid()
+# Comment: title, detail = describe_element(el)
                       title, detail = describe_element(el)
+# Blank line
 
+# Comment: if tag == 'choice':
                       if tag == 'choice':
+# Comment: label = clean_mermaid(title)
                           label = clean_mermaid(title)
+# Comment: lines.append(f'    {n}{{{{{label}}}}}')
                           lines.append(f'    {n}{{{{{label}}}}}')
+# Comment: if last:
                           if last:
+# Comment: lines.append(f'    {last} --> {n}')
                               lines.append(f'    {last} --> {n}')
+# Comment: merge = nid()
                           merge = nid()
+# Comment: lines.append(f'    {merge}([Merge / Response])')
                           lines.append(f'    {merge}([Merge / Response])')
+# Comment: for route in el:
                           for route in el:
+# Comment: rt = get_tag(route)
                               rt = get_tag(route)
+# Comment: if rt not in ('when','otherwise'):
                               if rt not in ('when','otherwise'):
+# Comment: continue
                                   continue
+# Comment: cond = route.attrib.get('expression','otherwise')
                               cond = route.attrib.get('expression','otherwise')
+# Comment: cond = clean_mermaid(cond)[:40]
                               cond = clean_mermaid(cond)[:40]
+# Comment: rn   = nid()
                               rn   = nid()
+# Comment: inner = [c for c in route if get_tag(c) not in NOISE_TAGS]
                               inner = [c for c in route if get_tag(c) not in NOISE_TAGS]
+# Comment: if inner:
                               if inner:
+# Comment: it, id_ = describe_element(inner[0])
                                   it, id_ = describe_element(inner[0])
+# Comment: rlabel  = clean_mermaid(f"{it}: {id_}")
                                   rlabel  = clean_mermaid(f"{it}: {id_}")
+# Comment: else:
                               else:
+# Comment: rlabel = rt
                                   rlabel = rt
+# Comment: lines.append(f'    {rn}[{rlabel}]')
                               lines.append(f'    {rn}[{rlabel}]')
+# Comment: lines.append(f'    {n} -->|{cond}| {rn}')
                               lines.append(f'    {n} -->|{cond}| {rn}')
+# Comment: lines.append(f'    {rn} --> {merge}')
                               lines.append(f'    {rn} --> {merge}')
+# Comment: last = merge
                           last = merge
+# Comment: continue
                           continue
+# Blank line
 
+# Comment: elif tag == 'scatter-gather':
                       elif tag == 'scatter-gather':
+# Comment: label = clean_mermaid(title)
                           label = clean_mermaid(title)
+# Comment: lines.append(f'    {n}[{label}]')
                           lines.append(f'    {n}[{label}]')
+# Comment: if last:
                           if last:
+# Comment: lines.append(f'    {last} --> {n}')
                               lines.append(f'    {last} --> {n}')
+# Comment: merge = nid()
                           merge = nid()
+# Comment: lines.append(f'    {merge}([Merge Results])')
                           lines.append(f'    {merge}([Merge Results])')
+# Comment: routes = [c for c in el if get_tag(c) not in NOISE_TAGS]
                           routes = [c for c in el if get_tag(c) not in NOISE_TAGS]
+# Comment: for ri, route in enumerate(routes, 1):
                           for ri, route in enumerate(routes, 1):
+# Comment: rn    = nid()
                               rn    = nid()
+# Comment: inner = [c for c in route if get_tag(c) not in NOISE_TAGS]
                               inner = [c for c in route if get_tag(c) not in NOISE_TAGS]
+# Comment: if inner:
                               if inner:
+# Comment: it, id_ = describe_element(inner[0])
                                   it, id_ = describe_element(inner[0])
+# Comment: rlabel  = clean_mermaid(f"Route {ri}: {it}")
                                   rlabel  = clean_mermaid(f"Route {ri}: {it}")
+# Comment: else:
                               else:
+# Comment: rlabel = f"Route {ri}"
                                   rlabel = f"Route {ri}"
+# Comment: lines.append(f'    {rn}[{rlabel}]')
                               lines.append(f'    {rn}[{rlabel}]')
+# Comment: lines.append(f'    {n} --> {rn}')
                               lines.append(f'    {n} --> {rn}')
+# Comment: lines.append(f'    {rn} --> {merge}')
                               lines.append(f'    {rn} --> {merge}')
+# Comment: last = merge
                           last = merge
+# Comment: continue
                           continue
+# Blank line
 
+# Comment: elif tag == 'try':
                       elif tag == 'try':
+# Comment: label = clean_mermaid(title)
                           label = clean_mermaid(title)
+# Comment: lines.append(f'    {n}[{label}]')
                           lines.append(f'    {n}[{label}]')
+# Comment: if last:
                           if last:
+# Comment: lines.append(f'    {last} --> {n}')
                               lines.append(f'    {last} --> {n}')
+# Comment: inner_children = [c for c in el
                           inner_children = [c for c in el
+# Comment: if get_tag(c) not in NOISE_TAGS
                                             if get_tag(c) not in NOISE_TAGS
+# Comment: and get_tag(c) != 'error-handler']
                                             and get_tag(c) != 'error-handler']
+# Comment: last = process_children(inner_children, n)
                           last = process_children(inner_children, n)
+# Comment: for c in el:
                           for c in el:
+# Comment: if get_tag(c) == 'error-handler':
                               if get_tag(c) == 'error-handler':
+# Comment: en = nid()
                                   en = nid()
+# Comment: for h in c:
                                   for h in c:
+# Comment: ht = get_tag(h)
                                       ht = get_tag(h)
+# Comment: lines.append(f'    {en}[On Error: {ht}]')
                                       lines.append(f'    {en}[On Error: {ht}]')
+# Comment: lines.append(f'    {n} -->|error| {en}')
                                       lines.append(f'    {n} -->|error| {en}')
+# Comment: continue
                           continue
+# Blank line
 
+# Comment: elif tag in ('foreach','parallel-foreach','async','until-successful'):
                       elif tag in ('foreach','parallel-foreach','async','until-successful'):
+# Comment: label = clean_mermaid(f"{title}: {detail}"[:55])
                           label = clean_mermaid(f"{title}: {detail}"[:55])
+# Comment: lines.append(f'    {n}[{label}]')
                           lines.append(f'    {n}[{label}]')
+# Comment: if last:
                           if last:
+# Comment: lines.append(f'    {last} --> {n}')
                               lines.append(f'    {last} --> {n}')
+# Comment: inner_children = [c for c in el if get_tag(c) not in NOISE_TAGS]
                           inner_children = [c for c in el if get_tag(c) not in NOISE_TAGS]
+# Comment: last = process_children(inner_children, n)
                           last = process_children(inner_children, n)
+# Comment: continue
                           continue
+# Blank line
 
+# Comment: elif tag == 'error-handler':
                       elif tag == 'error-handler':
+# Comment: for h in el:
                           for h in el:
+# Comment: ht   = get_tag(h)
                               ht   = get_tag(h)
+# Comment: etyp = h.attrib.get('type','ANY')
                               etyp = h.attrib.get('type','ANY')
+# Comment: en   = nid()
                               en   = nid()
+# Comment: lines.append(f'    {en}[{clean_mermaid(ht)}: {clean_mermaid(etyp)}]')
                               lines.append(f'    {en}[{clean_mermaid(ht)}: {clean_mermaid(etyp)}]')
+# Comment: if last:
                               if last:
+# Comment: lines.append(f'    {last} -->|error| {en}')
                                   lines.append(f'    {last} -->|error| {en}')
+# Comment: continue
                           continue
+# Blank line
 
+# Comment: label = clean_mermaid(f"{title}: {detail}" if detail else title)
                       label = clean_mermaid(f"{title}: {detail}" if detail else title)
+# Comment: lines.append(f'    {n}[{label}]')
                       lines.append(f'    {n}[{label}]')
+# Comment: if last:
                       if last:
+# Comment: lines.append(f'    {last} --> {n}')
                           lines.append(f'    {last} --> {n}')
+# Comment: last = n
                       last = n
+# Blank line
 
+# Comment: return last
                   return last
+# Blank line
 
+# Comment: children = [c for c in flow_el if get_tag(c) not in NOISE_TAGS]
               children = [c for c in flow_el if get_tag(c) not in NOISE_TAGS]
+# Comment: process_children(children, None)
               process_children(children, None)
+# Blank line
 
+# Comment: if len(lines) == 1:
               if len(lines) == 1:
+# Comment: lines.append('    A[No components defined]')
                   lines.append('    A[No components defined]')
+# Blank line
 
+# Comment: return '\n'.join(lines)
               return '\n'.join(lines)
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # CONNECTOR SUMMARY
           # CONNECTOR SUMMARY
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def extract_connectors(flow_el):
           def extract_connectors(flow_el):
+# Comment: rows = []
               rows = []
+# Comment: seen = set()
               seen = set()
+# Comment: CONNECTOR_PREFIXES = {
               CONNECTOR_PREFIXES = {
+# Comment: 'http','db','os','file','ftp','sftp','jms','vm',
                   'http','db','os','file','ftp','sftp','jms','vm',
+# Comment: 'salesforce','email','compression','crypto','validation',
                   'salesforce','email','compression','crypto','validation',
+# Comment: }
               }
+# Comment: CORE_SHOW = {
               CORE_SHOW = {
+# Comment: 'logger','set-payload','set-variable','transform',
                   'logger','set-payload','set-variable','transform',
+# Comment: 'scatter-gather','choice','flow-ref','foreach',
                   'scatter-gather','choice','flow-ref','foreach',
+# Comment: 'parallel-foreach','try','async','until-successful',
                   'parallel-foreach','try','async','until-successful',
+# Comment: 'scheduler',
                   'scheduler',
+# Comment: }
               }
+# Comment: for el in flow_el.iter():
               for el in flow_el.iter():
+# Comment: tag    = get_tag(el)
                   tag    = get_tag(el)
+# Comment: prefix = get_prefix(el)
                   prefix = get_prefix(el)
+# Comment: if tag in NOISE_TAGS:
                   if tag in NOISE_TAGS:
+# Comment: continue
                       continue
+# Comment: is_conn = prefix in CONNECTOR_PREFIXES
                   is_conn = prefix in CONNECTOR_PREFIXES
+# Comment: is_core = prefix in ('mule','ee','') and tag in CORE_SHOW
                   is_core = prefix in ('mule','ee','') and tag in CORE_SHOW
+# Comment: if not (is_conn or is_core):
                   if not (is_conn or is_core):
+# Comment: continue
                       continue
+# Comment: connector  = f"{prefix.upper()} {tag.replace('-',' ').title()}".strip() if is_co
                   connector  = f"{prefix.upper()} {tag.replace('-',' ').title()}".strip() if is_conn else tag.replace('-',' ').title()
+# Comment: operation  = tag.replace('-',' ').title()
                   operation  = tag.replace('-',' ').title()
+# Comment: config_ref = el.attrib.get('config-ref','—')
                   config_ref = el.attrib.get('config-ref','—')
+# Comment: notes_bits = []
                   notes_bits = []
+# Comment: for attr in ('path','url','directory','destination','queueName',
                   for attr in ('path','url','directory','destination','queueName',
+# Comment: 'key','variableName','collection','name','type',
                                'key','variableName','collection','name','type',
+# Comment: 'allowedMethods','method','level','watermarkMode'):
                                'allowedMethods','method','level','watermarkMode'):
+# Comment: v = el.attrib.get(attr)
                       v = el.attrib.get(attr)
+# Comment: if v:
                       if v:
+# Comment: notes_bits.append(f"{attr}={v[:35]}")
                           notes_bits.append(f"{attr}={v[:35]}")
+# Comment: notes = ', '.join(notes_bits[:2]) if notes_bits else '—'
                   notes = ', '.join(notes_bits[:2]) if notes_bits else '—'
+# Comment: key   = f"{connector}::{operation}"
                   key   = f"{connector}::{operation}"
+# Comment: if key not in seen:
                   if key not in seen:
+# Comment: seen.add(key)
                       seen.add(key)
+# Comment: rows.append((connector, operation, config_ref, notes))
                       rows.append((connector, operation, config_ref, notes))
+# Comment: return rows
               return rows
+# Blank line
 
+# Comment: def extract_error_handling(flow_el):
           def extract_error_handling(flow_el):
+# Comment: handlers = []
               handlers = []
+# Comment: for el in flow_el.iter():
               for el in flow_el.iter():
+# Comment: if get_tag(el) == 'error-handler':
                   if get_tag(el) == 'error-handler':
+# Comment: for h in el:
                       for h in el:
+# Comment: handlers.append((
                           handlers.append((
+# Comment: get_tag(h),
                               get_tag(h),
+# Comment: h.attrib.get('type','ANY'),
                               h.attrib.get('type','ANY'),
+# Comment: h.attrib.get('enableNotifications','true'),
                               h.attrib.get('enableNotifications','true'),
+# Comment: ))
                           ))
+# Comment: return handlers
               return handlers
+# Blank line
 
+# Comment: def extract_config_props(flow_el):
           def extract_config_props(flow_el):
+# Comment: props = set()
               props = set()
+# Comment: for el in flow_el.iter():
               for el in flow_el.iter():
+# Comment: for v in el.attrib.values():
                   for v in el.attrib.values():
+# Comment: props.update(re.findall(r'\$\{[^}]+\}', v))
                       props.update(re.findall(r'\$\{[^}]+\}', v))
+# Comment: if el.text:
                   if el.text:
+# Comment: props.update(re.findall(r'\$\{[^}]+\}', el.text))
                       props.update(re.findall(r'\$\{[^}]+\}', el.text))
+# Comment: return sorted(props)
               return sorted(props)
+# Blank line
 
+# Comment: def extract_flow_refs(flow_el):
           def extract_flow_refs(flow_el):
+# Comment: return [el.attrib.get('name','?')
               return [el.attrib.get('name','?')
+# Comment: for el in flow_el.iter() if get_tag(el) == 'flow-ref']
                       for el in flow_el.iter() if get_tag(el) == 'flow-ref']
+# Blank line
 
+# Comment: def extract_set_vars(flow_el):
           def extract_set_vars(flow_el):
+# Comment: return list(dict.fromkeys(
               return list(dict.fromkeys(
+# Comment: el.attrib.get('variableName','?')
                   el.attrib.get('variableName','?')
+# Comment: for el in flow_el.iter() if get_tag(el) == 'set-variable'
                   for el in flow_el.iter() if get_tag(el) == 'set-variable'
+# Comment: ))
               ))
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # TRIGGER PARSER
           # TRIGGER PARSER
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def parse_trigger(flow_el):
           def parse_trigger(flow_el):
+# Comment: children = list(flow_el)
               children = list(flow_el)
+# Comment: if not children:
               if not children:
+# Comment: return {'Type': 'None — no trigger defined'}
                   return {'Type': 'None — no trigger defined'}
+# Comment: t      = children[0]
               t      = children[0]
+# Comment: tag    = get_tag(t)
               tag    = get_tag(t)
+# Comment: prefix = get_prefix(t)
               prefix = get_prefix(t)
+# Comment: a      = t.attrib
               a      = t.attrib
+# Comment: info   = {}
               info   = {}
+# Blank line
 
+# Comment: if tag == 'listener' and prefix == 'http':
               if tag == 'listener' and prefix == 'http':
+# Comment: info = {
                   info = {
+# Comment: 'Type':       'HTTP Listener',
                       'Type':       'HTTP Listener',
+# Comment: 'Path':       a.get('path','—'),
                       'Path':       a.get('path','—'),
+# Comment: 'Method':     a.get('allowedMethods','ANY (not restricted)'),
                       'Method':     a.get('allowedMethods','ANY (not restricted)'),
+# Comment: 'Config Ref': a.get('config-ref','—'),
                       'Config Ref': a.get('config-ref','—'),
+# Comment: }
                   }
+# Comment: elif tag == 'listener' and prefix == 'file':
               elif tag == 'listener' and prefix == 'file':
+# Comment: info = {
                   info = {
+# Comment: 'Type':          'File Listener (On New or Updated File)',
                       'Type':          'File Listener (On New or Updated File)',
+# Comment: 'Directory':     a.get('directory','—'),
                       'Directory':     a.get('directory','—'),
+# Comment: 'Move To':       a.get('moveToDirectory','—'),
                       'Move To':       a.get('moveToDirectory','—'),
+# Comment: 'Watermark Mode':a.get('watermarkMode','—'),
                       'Watermark Mode':a.get('watermarkMode','—'),
+# Comment: 'Config Ref':    a.get('config-ref','—'),
                       'Config Ref':    a.get('config-ref','—'),
+# Comment: }
                   }
+# Comment: for s in t.iter():
                   for s in t.iter():
+# Comment: if get_tag(s) == 'fixed-frequency':
                       if get_tag(s) == 'fixed-frequency':
+# Comment: info['Schedule'] = f"Every {s.attrib.get('frequency','?')} {s.attrib.get('timeUn
                           info['Schedule'] = f"Every {s.attrib.get('frequency','?')} {s.attrib.get('timeUnit','?')}"
+# Comment: elif tag == 'scheduler':
               elif tag == 'scheduler':
+# Comment: info = {'Type': 'Scheduler'}
                   info = {'Type': 'Scheduler'}
+# Comment: for s in t.iter():
                   for s in t.iter():
+# Comment: if get_tag(s) == 'fixed-frequency':
                       if get_tag(s) == 'fixed-frequency':
+# Comment: info['Schedule'] = f"Fixed frequency — every {s.attrib.get('frequency','?')} {s.
                           info['Schedule'] = f"Fixed frequency — every {s.attrib.get('frequency','?')} {s.attrib.get('timeUnit','?')}"
+# Comment: elif get_tag(s) == 'cron':
                       elif get_tag(s) == 'cron':
+# Comment: info['Cron Expression'] = s.attrib.get('expression','—')
                           info['Cron Expression'] = s.attrib.get('expression','—')
+# Comment: info['Time Zone']        = s.attrib.get('timeZone','—')
                           info['Time Zone']        = s.attrib.get('timeZone','—')
+# Comment: elif tag == 'listener' and prefix == 'jms':
               elif tag == 'listener' and prefix == 'jms':
+# Comment: info = {
                   info = {
+# Comment: 'Type':        'JMS Listener',
                       'Type':        'JMS Listener',
+# Comment: 'Destination': a.get('destination', a.get('queueName','—')),
                       'Destination': a.get('destination', a.get('queueName','—')),
+# Comment: 'Config Ref':  a.get('config-ref','—'),
                       'Config Ref':  a.get('config-ref','—'),
+# Comment: }
                   }
+# Comment: elif tag == 'listener' and prefix == 'vm':
               elif tag == 'listener' and prefix == 'vm':
+# Comment: info = {
                   info = {
+# Comment: 'Type':      'VM Listener',
                       'Type':      'VM Listener',
+# Comment: 'Queue':     a.get('queueName','—'),
                       'Queue':     a.get('queueName','—'),
+# Comment: 'Config Ref':a.get('config-ref','—'),
                       'Config Ref':a.get('config-ref','—'),
+# Comment: }
                   }
+# Comment: elif tag == 'listener' and prefix in ('ftp','sftp'):
               elif tag == 'listener' and prefix in ('ftp','sftp'):
+# Comment: info = {
                   info = {
+# Comment: 'Type':       f'{prefix.upper()} Listener',
                       'Type':       f'{prefix.upper()} Listener',
+# Comment: 'Directory':  a.get('directory','—'),
                       'Directory':  a.get('directory','—'),
+# Comment: 'Config Ref': a.get('config-ref','—'),
                       'Config Ref': a.get('config-ref','—'),
+# Comment: }
                   }
+# Comment: for s in t.iter():
                   for s in t.iter():
+# Comment: if get_tag(s) == 'fixed-frequency':
                       if get_tag(s) == 'fixed-frequency':
+# Comment: info['Schedule'] = f"Every {s.attrib.get('frequency','?')} {s.attrib.get('timeUn
                           info['Schedule'] = f"Every {s.attrib.get('frequency','?')} {s.attrib.get('timeUnit','?')}"
+# Comment: elif tag == 'logger':
               elif tag == 'logger':
+# Comment: info = {'Type': 'None (orphan/utility flow — starts with Logger, no trigger)'}
                   info = {'Type': 'None (orphan/utility flow — starts with Logger, no trigger)'}
+# Comment: else:
               else:
+# Comment: info = {'Type': f'{prefix}:{tag}', 'Config Ref': a.get('config-ref','—')}
                   info = {'Type': f'{prefix}:{tag}', 'Config Ref': a.get('config-ref','—')}
+# Comment: info.update({k: v for k, v in a.items()
                   info.update({k: v for k, v in a.items()
+# Comment: if k not in ('config-ref','doc:name','doc:id')})
                                 if k not in ('config-ref','doc:name','doc:id')})
+# Comment: return info
               return info
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # WORD DOC STYLE HELPERS
           # WORD DOC STYLE HELPERS
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def shade_cell(cell, hex_color):
           def shade_cell(cell, hex_color):
+# Comment: tc   = cell._tc
               tc   = cell._tc
+# Comment: tcPr = tc.get_or_add_tcPr()
               tcPr = tc.get_or_add_tcPr()
+# Comment: shd  = OxmlElement('w:shd')
               shd  = OxmlElement('w:shd')
+# Comment: shd.set(qn('w:val'),   'clear')
               shd.set(qn('w:val'),   'clear')
+# Comment: shd.set(qn('w:color'), 'auto')
               shd.set(qn('w:color'), 'auto')
+# Comment: shd.set(qn('w:fill'),  hex_color)
               shd.set(qn('w:fill'),  hex_color)
+# Comment: tcPr.append(shd)
               tcPr.append(shd)
+# Blank line
 
+# Comment: def add_divider(doc, color='2E75B6'):
           def add_divider(doc, color='2E75B6'):
+# Comment: p   = doc.add_paragraph()
               p   = doc.add_paragraph()
+# Comment: p.paragraph_format.space_before = Pt(2)
               p.paragraph_format.space_before = Pt(2)
+# Comment: p.paragraph_format.space_after  = Pt(2)
               p.paragraph_format.space_after  = Pt(2)
+# Comment: pPr = p._p.get_or_add_pPr()
               pPr = p._p.get_or_add_pPr()
+# Comment: pBd = OxmlElement('w:pBdr')
               pBd = OxmlElement('w:pBdr')
+# Comment: bt  = OxmlElement('w:bottom')
               bt  = OxmlElement('w:bottom')
+# Comment: bt.set(qn('w:val'),   'single')
               bt.set(qn('w:val'),   'single')
+# Comment: bt.set(qn('w:sz'),    '6')
               bt.set(qn('w:sz'),    '6')
+# Comment: bt.set(qn('w:space'), '1')
               bt.set(qn('w:space'), '1')
+# Comment: bt.set(qn('w:color'), color)
               bt.set(qn('w:color'), color)
+# Comment: pBd.append(bt)
               pBd.append(bt)
+# Comment: pPr.append(pBd)
               pPr.append(pBd)
+# Blank line
 
+# Comment: def add_kv(doc, key, value, indent=False):
           def add_kv(doc, key, value, indent=False):
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: p.paragraph_format.space_after = Pt(2)
               p.paragraph_format.space_after = Pt(2)
+# Comment: if indent:
               if indent:
+# Comment: p.paragraph_format.left_indent = Inches(0.25)
                   p.paragraph_format.left_indent = Inches(0.25)
+# Comment: r1 = p.add_run(f"{key}: ")
               r1 = p.add_run(f"{key}: ")
+# Comment: r1.bold = True
               r1.bold = True
+# Comment: set_font_color(r1, BLUE_DARK)
               set_font_color(r1, BLUE_DARK)
+# Comment: r2 = p.add_run(safe(value))
               r2 = p.add_run(safe(value))
+# Comment: set_font_color(r2, BLACK)
               set_font_color(r2, BLACK)
+# Blank line
 
+# Comment: def add_bullet(doc, text, indent=0.25):
           def add_bullet(doc, text, indent=0.25):
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: p.paragraph_format.left_indent = Inches(indent)
               p.paragraph_format.left_indent = Inches(indent)
+# Comment: p.paragraph_format.space_after = Pt(2)
               p.paragraph_format.space_after = Pt(2)
+# Comment: p.add_run('• ' + text).font.size = Pt(10)
               p.add_run('• ' + text).font.size = Pt(10)
+# Blank line
 
+# Comment: def add_code_block(doc, code, small=False):
           def add_code_block(doc, code, small=False):
+# Comment: for line in code.strip().split('\n'):
               for line in code.strip().split('\n'):
+# Comment: p   = doc.add_paragraph()
                   p   = doc.add_paragraph()
+# Comment: p.paragraph_format.left_indent  = Inches(0.25)
                   p.paragraph_format.left_indent  = Inches(0.25)
+# Comment: p.paragraph_format.right_indent = Inches(0.25)
                   p.paragraph_format.right_indent = Inches(0.25)
+# Comment: p.paragraph_format.space_before = Pt(0)
                   p.paragraph_format.space_before = Pt(0)
+# Comment: p.paragraph_format.space_after  = Pt(0)
                   p.paragraph_format.space_after  = Pt(0)
+# Comment: pPr = p._p.get_or_add_pPr()
                   pPr = p._p.get_or_add_pPr()
+# Comment: shd = OxmlElement('w:shd')
                   shd = OxmlElement('w:shd')
+# Comment: shd.set(qn('w:val'),   'clear')
                   shd.set(qn('w:val'),   'clear')
+# Comment: shd.set(qn('w:color'), 'auto')
                   shd.set(qn('w:color'), 'auto')
+# Comment: shd.set(qn('w:fill'),  CODE_BG)
                   shd.set(qn('w:fill'),  CODE_BG)
+# Comment: pPr.append(shd)
                   pPr.append(shd)
+# Comment: run = p.add_run(line if line else ' ')
                   run = p.add_run(line if line else ' ')
+# Comment: run.font.name  = 'Courier New'
                   run.font.name  = 'Courier New'
+# Comment: run.font.size  = Pt(8 if small else 9)
                   run.font.size  = Pt(8 if small else 9)
+# Comment: set_font_color(run, CODE_FG)
                   set_font_color(run, CODE_FG)
+# Comment: doc.add_paragraph().paragraph_format.space_after = Pt(4)
               doc.add_paragraph().paragraph_format.space_after = Pt(4)
+# Blank line
 
+# Comment: def add_mermaid_block(doc, code):
           def add_mermaid_block(doc, code):
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: r = p.add_run('Flow Diagram (Mermaid)')
               r = p.add_run('Flow Diagram (Mermaid)')
+# Comment: r.bold = True
               r.bold = True
+# Comment: set_font_color(r, BLUE_MID)
               set_font_color(r, BLUE_MID)
+# Comment: r.font.size = Pt(10)
               r.font.size = Pt(10)
+# Comment: add_code_block(doc, '```mermaid\n' + code + '\n```', small=True)
               add_code_block(doc, '```mermaid\n' + code + '\n```', small=True)
+# Blank line
 
+# Comment: def add_table(doc, headers, rows, col_widths):
           def add_table(doc, headers, rows, col_widths):
+# Comment: if not rows:
               if not rows:
+# Comment: doc.add_paragraph('').add_run('None').italic = True
                   doc.add_paragraph('').add_run('None').italic = True
+# Comment: return
                   return
+# Comment: tbl = doc.add_table(rows=1, cols=len(headers))
               tbl = doc.add_table(rows=1, cols=len(headers))
+# Comment: tbl.style = 'Table Grid'
               tbl.style = 'Table Grid'
+# Comment: hdr_cells = tbl.rows[0].cells
               hdr_cells = tbl.rows[0].cells
+# Comment: for i, h in enumerate(headers):
               for i, h in enumerate(headers):
+# Comment: hdr_cells[i].width = Inches(col_widths[i])
                   hdr_cells[i].width = Inches(col_widths[i])
+# Comment: shade_cell(hdr_cells[i], '2E75B6')
                   shade_cell(hdr_cells[i], '2E75B6')
+# Comment: p   = hdr_cells[i].paragraphs[0]
                   p   = hdr_cells[i].paragraphs[0]
+# Comment: run = p.add_run(h)
                   run = p.add_run(h)
+# Comment: run.bold = True
                   run.bold = True
+# Comment: set_font_color(run, WHITE)
                   set_font_color(run, WHITE)
+# Comment: run.font.size = Pt(10)
                   run.font.size = Pt(10)
+# Comment: for ri, row_data in enumerate(rows):
               for ri, row_data in enumerate(rows):
+# Comment: cells = tbl.add_row().cells
                   cells = tbl.add_row().cells
+# Comment: fill  = 'EBF3FB' if ri % 2 == 0 else 'FFFFFF'
                   fill  = 'EBF3FB' if ri % 2 == 0 else 'FFFFFF'
+# Comment: for i, val in enumerate(row_data):
                   for i, val in enumerate(row_data):
+# Comment: cells[i].width = Inches(col_widths[i])
                       cells[i].width = Inches(col_widths[i])
+# Comment: shade_cell(cells[i], fill)
                       shade_cell(cells[i], fill)
+# Comment: p   = cells[i].paragraphs[0]
                       p   = cells[i].paragraphs[0]
+# Comment: run = p.add_run(safe(val))
                       run = p.add_run(safe(val))
+# Comment: run.font.size = Pt(9)
                       run.font.size = Pt(9)
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # LOGIC STEPS WITH INLINE DATAWEAVE
           # LOGIC STEPS WITH INLINE DATAWEAVE
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def add_logic_steps_with_dw(doc, flow_el):
           def add_logic_steps_with_dw(doc, flow_el):
+# Comment: step_num = [0]
               step_num = [0]
+# Blank line
 
+# Comment: def render_step(el, depth=0):
               def render_step(el, depth=0):
+# Comment: tag    = get_tag(el)
                   tag    = get_tag(el)
+# Comment: prefix = get_prefix(el)
                   prefix = get_prefix(el)
+# Comment: if tag in NOISE_TAGS:
                   if tag in NOISE_TAGS:
+# Comment: return
                       return
+# Blank line
 
+# Comment: step_num[0] += 1
                   step_num[0] += 1
+# Comment: title, detail = describe_element(el)
                   title, detail = describe_element(el)
+# Comment: indent = Inches(0.25 + depth * 0.25)
                   indent = Inches(0.25 + depth * 0.25)
+# Blank line
 
+# Comment: p   = doc.add_paragraph()
                   p   = doc.add_paragraph()
+# Comment: p.paragraph_format.left_indent = indent
                   p.paragraph_format.left_indent = indent
+# Comment: p.paragraph_format.space_after = Pt(2)
                   p.paragraph_format.space_after = Pt(2)
+# Comment: num_run = p.add_run(f"Step {step_num[0]}  ")
                   num_run = p.add_run(f"Step {step_num[0]}  ")
+# Comment: num_run.bold = True
                   num_run.bold = True
+# Comment: set_font_color(num_run, BLUE_MID)
                   set_font_color(num_run, BLUE_MID)
+# Comment: num_run.font.size = Pt(10)
                   num_run.font.size = Pt(10)
+# Comment: title_run = p.add_run(title)
                   title_run = p.add_run(title)
+# Comment: title_run.bold = True
                   title_run.bold = True
+# Comment: title_run.font.size = Pt(10)
                   title_run.font.size = Pt(10)
+# Blank line
 
+# Comment: if detail:
                   if detail:
+# Comment: d = doc.add_paragraph()
                       d = doc.add_paragraph()
+# Comment: d.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
                       d.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
+# Comment: d.paragraph_format.space_after = Pt(1)
                       d.paragraph_format.space_after = Pt(1)
+# Comment: d.add_run(detail).font.size = Pt(9)
                       d.add_run(detail).font.size = Pt(9)
+# Blank line
 
+# Comment: dw_scripts = get_dw_for_element(el)
                   dw_scripts = get_dw_for_element(el)
+# Comment: if dw_scripts:
                   if dw_scripts:
+# Comment: for label, script in dw_scripts:
                       for label, script in dw_scripts:
+# Comment: lp = doc.add_paragraph()
                           lp = doc.add_paragraph()
+# Comment: lp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
                           lp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
+# Comment: lp.paragraph_format.space_after = Pt(1)
                           lp.paragraph_format.space_after = Pt(1)
+# Comment: lr = lp.add_run(f'DataWeave — {label}')
                           lr = lp.add_run(f'DataWeave — {label}')
+# Comment: lr.italic = True
                           lr.italic = True
+# Comment: set_font_color(lr, GREEN_DARK)
                           set_font_color(lr, GREEN_DARK)
+# Comment: lr.font.size = Pt(9)
                           lr.font.size = Pt(9)
+# Comment: for line in script.strip().split('\n'):
                           for line in script.strip().split('\n'):
+# Comment: cp = doc.add_paragraph()
                               cp = doc.add_paragraph()
+# Comment: cp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.35)
                               cp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.35)
+# Comment: cp.paragraph_format.space_before = Pt(0)
                               cp.paragraph_format.space_before = Pt(0)
+# Comment: cp.paragraph_format.space_after  = Pt(0)
                               cp.paragraph_format.space_after  = Pt(0)
+# Comment: pPr = cp._p.get_or_add_pPr()
                               pPr = cp._p.get_or_add_pPr()
+# Comment: shd = OxmlElement('w:shd')
                               shd = OxmlElement('w:shd')
+# Comment: shd.set(qn('w:val'),   'clear')
                               shd.set(qn('w:val'),   'clear')
+# Comment: shd.set(qn('w:color'), 'auto')
                               shd.set(qn('w:color'), 'auto')
+# Comment: shd.set(qn('w:fill'),  CODE_BG)
                               shd.set(qn('w:fill'),  CODE_BG)
+# Comment: pPr.append(shd)
                               pPr.append(shd)
+# Comment: cr = cp.add_run(line if line else ' ')
                               cr = cp.add_run(line if line else ' ')
+# Comment: cr.font.name  = 'Courier New'
                               cr.font.name  = 'Courier New'
+# Comment: cr.font.size  = Pt(8)
                               cr.font.size  = Pt(8)
+# Comment: set_font_color(cr, CODE_FG)
                               set_font_color(cr, CODE_FG)
+# Comment: doc.add_paragraph().paragraph_format.space_after = Pt(2)
                           doc.add_paragraph().paragraph_format.space_after = Pt(2)
+# Blank line
 
+# Comment: if tag == 'scatter-gather':
                   if tag == 'scatter-gather':
+# Comment: routes = [c for c in el if get_tag(c) not in NOISE_TAGS]
                       routes = [c for c in el if get_tag(c) not in NOISE_TAGS]
+# Comment: for ri, route in enumerate(routes, 1):
                       for ri, route in enumerate(routes, 1):
+# Comment: rp = doc.add_paragraph()
                           rp = doc.add_paragraph()
+# Comment: rp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
                           rp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
+# Comment: rp.paragraph_format.space_after = Pt(1)
                           rp.paragraph_format.space_after = Pt(1)
+# Comment: rr = rp.add_run(f'↳ Parallel Route {ri}')
                           rr = rp.add_run(f'↳ Parallel Route {ri}')
+# Comment: rr.bold = True
                           rr.bold = True
+# Comment: set_font_color(rr, BLUE_LIGHT)
                           set_font_color(rr, BLUE_LIGHT)
+# Comment: rr.font.size = Pt(9)
                           rr.font.size = Pt(9)
+# Comment: for child in route:
                           for child in route:
+# Comment: render_step(child, depth + 1)
                               render_step(child, depth + 1)
+# Blank line
 
+# Comment: elif tag == 'choice':
                   elif tag == 'choice':
+# Comment: for route in el:
                       for route in el:
+# Comment: rt   = get_tag(route)
                           rt   = get_tag(route)
+# Comment: if rt not in ('when','otherwise'):
                           if rt not in ('when','otherwise'):
+# Comment: continue
                               continue
+# Comment: cond = route.attrib.get('expression','otherwise')
                           cond = route.attrib.get('expression','otherwise')
+# Comment: rp   = doc.add_paragraph()
                           rp   = doc.add_paragraph()
+# Comment: rp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
                           rp.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
+# Comment: rp.paragraph_format.space_after = Pt(1)
                           rp.paragraph_format.space_after = Pt(1)
+# Comment: rr = rp.add_run(f'↳ When: {cond[:80]}' if rt == 'when' else '↳ Otherwise')
                           rr = rp.add_run(f'↳ When: {cond[:80]}' if rt == 'when' else '↳ Otherwise')
+# Comment: rr.bold = True
                           rr.bold = True
+# Comment: set_font_color(rr, BLUE_LIGHT)
                           set_font_color(rr, BLUE_LIGHT)
+# Comment: rr.font.size = Pt(9)
                           rr.font.size = Pt(9)
+# Comment: for child in route:
                           for child in route:
+# Comment: render_step(child, depth + 1)
                               render_step(child, depth + 1)
+# Blank line
 
+# Comment: elif tag == 'try':
                   elif tag == 'try':
+# Comment: inner = [c for c in el
                       inner = [c for c in el
+# Comment: if get_tag(c) not in NOISE_TAGS
                                if get_tag(c) not in NOISE_TAGS
+# Comment: and get_tag(c) != 'error-handler']
                                and get_tag(c) != 'error-handler']
+# Comment: for child in inner:
                       for child in inner:
+# Comment: render_step(child, depth + 1)
                           render_step(child, depth + 1)
+# Comment: for c in el:
                       for c in el:
+# Comment: if get_tag(c) == 'error-handler':
                           if get_tag(c) == 'error-handler':
+# Comment: ep = doc.add_paragraph()
                               ep = doc.add_paragraph()
+# Comment: ep.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
                               ep.paragraph_format.left_indent = Inches(0.25 + depth * 0.25 + 0.2)
+# Comment: ep.paragraph_format.space_after = Pt(1)
                               ep.paragraph_format.space_after = Pt(1)
+# Comment: er = ep.add_run('↳ Error Handler (inside Try)')
                               er = ep.add_run('↳ Error Handler (inside Try)')
+# Comment: er.bold = True
                               er.bold = True
+# Comment: set_font_color(er, ERR_RED)
                               set_font_color(er, ERR_RED)
+# Comment: er.font.size = Pt(9)
                               er.font.size = Pt(9)
+# Comment: for h in c:
                               for h in c:
+# Comment: render_step(h, depth + 1)
                                   render_step(h, depth + 1)
+# Blank line
 
+# Comment: elif tag in ('foreach','parallel-foreach','async','until-successful'):
                   elif tag in ('foreach','parallel-foreach','async','until-successful'):
+# Comment: for child in el:
                       for child in el:
+# Comment: if get_tag(child) not in NOISE_TAGS:
                           if get_tag(child) not in NOISE_TAGS:
+# Comment: render_step(child, depth + 1)
                               render_step(child, depth + 1)
+# Blank line
 
+# Comment: for child in flow_el:
               for child in flow_el:
+# Comment: if get_tag(child) not in NOISE_TAGS:
                   if get_tag(child) not in NOISE_TAGS:
+# Comment: render_step(child, depth=0)
                       render_step(child, depth=0)
+# Comment: sep = doc.add_paragraph()
                       sep = doc.add_paragraph()
+# Comment: sep.paragraph_format.space_after = Pt(1)
                       sep.paragraph_format.space_after = Pt(1)
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # OVERVIEW SENTENCE
           # OVERVIEW SENTENCE
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def build_overview(flow_el, trigger_info):
           def build_overview(flow_el, trigger_info):
+# Comment: children  = list(flow_el)
               children  = list(flow_el)
+# Comment: step_count = len([c for c in children if get_tag(c) not in NOISE_TAGS])
               step_count = len([c for c in children if get_tag(c) not in NOISE_TAGS])
+# Comment: ttype      = trigger_info.get('Type','Unknown')
               ttype      = trigger_info.get('Type','Unknown')
+# Comment: path       = trigger_info.get('Path','')
               path       = trigger_info.get('Path','')
+# Comment: sched      = trigger_info.get('Schedule','')
               sched      = trigger_info.get('Schedule','')
+# Comment: directory  = trigger_info.get('Directory','')
               directory  = trigger_info.get('Directory','')
+# Blank line
 
+# Comment: if 'HTTP' in ttype and path:
               if 'HTTP' in ttype and path:
+# Comment: return (f"An HTTP-triggered flow listening at `{path}` "
                   return (f"An HTTP-triggered flow listening at `{path}` "
+# Comment: f"[method: {trigger_info.get('Method','ANY')}]. "
                           f"[method: {trigger_info.get('Method','ANY')}]. "
+# Comment: f"Contains {step_count} top-level processing step(s).")
                           f"Contains {step_count} top-level processing step(s).")
+# Comment: if 'Scheduler' in ttype or sched:
               if 'Scheduler' in ttype or sched:
+# Comment: return (f"A scheduled flow that runs automatically "
                   return (f"A scheduled flow that runs automatically "
+# Comment: f"({sched or 'on a fixed schedule'}). "
                           f"({sched or 'on a fixed schedule'}). "
+# Comment: f"Contains {step_count} processing step(s).")
                           f"Contains {step_count} processing step(s).")
+# Comment: if 'File' in ttype and directory:
               if 'File' in ttype and directory:
+# Comment: return (f"A file-listener flow monitoring `{directory}` "
                   return (f"A file-listener flow monitoring `{directory}` "
+# Comment: f"for new or updated files. "
                           f"for new or updated files. "
+# Comment: f"Contains {step_count} processing step(s).")
                           f"Contains {step_count} processing step(s).")
+# Comment: if 'JMS' in ttype:
               if 'JMS' in ttype:
+# Comment: return (f"A JMS listener flow consuming from `{trigger_info.get('Destination','?
                   return (f"A JMS listener flow consuming from `{trigger_info.get('Destination','?')}`. "
+# Comment: f"Contains {step_count} processing step(s).")
                           f"Contains {step_count} processing step(s).")
+# Comment: if 'VM' in ttype:
               if 'VM' in ttype:
+# Comment: return (f"A VM listener flow consuming from queue `{trigger_info.get('Queue','?'
                   return (f"A VM listener flow consuming from queue `{trigger_info.get('Queue','?')}`. "
+# Comment: f"Contains {step_count} processing step(s).")
                           f"Contains {step_count} processing step(s).")
+# Comment: if 'orphan' in ttype.lower() or 'None' in ttype:
               if 'orphan' in ttype.lower() or 'None' in ttype:
+# Comment: return ("A utility or debug flow with no trigger. "
                   return ("A utility or debug flow with no trigger. "
+# Comment: "Cannot be invoked automatically — must be called via flow-ref or manually.")
                           "Cannot be invoked automatically — must be called via flow-ref or manually.")
+# Comment: return (f"A `{get_tag(flow_el)}` triggered by `{ttype}` "
               return (f"A `{get_tag(flow_el)}` triggered by `{ttype}` "
+# Comment: f"with {step_count} top-level processing step(s).")
                       f"with {step_count} top-level processing step(s).")
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # DOCUMENT ONE FLOW
           # DOCUMENT ONE FLOW
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: def document_flow(doc, flow_el, filename):
           def document_flow(doc, flow_el, filename):
+# Comment: flow_name    = flow_el.attrib.get('name','Unnamed Flow')
               flow_name    = flow_el.attrib.get('name','Unnamed Flow')
+# Comment: flow_type    = get_tag(flow_el)
               flow_type    = get_tag(flow_el)
+# Comment: trigger_info = parse_trigger(flow_el)
               trigger_info = parse_trigger(flow_el)
+# Blank line
 
+# Comment: doc.add_heading(f'Flow: {flow_name}', level=2)
               doc.add_heading(f'Flow: {flow_name}', level=2)
+# Comment: add_kv(doc, 'Source File', filename)
               add_kv(doc, 'Source File', filename)
+# Comment: add_kv(doc, 'Flow Type',   flow_type)
               add_kv(doc, 'Flow Type',   flow_type)
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: doc.add_heading('Overview', level=3)
               doc.add_heading('Overview', level=3)
+# Comment: p = doc.add_paragraph(build_overview(flow_el, trigger_info))
               p = doc.add_paragraph(build_overview(flow_el, trigger_info))
+# Comment: p.paragraph_format.space_after = Pt(6)
               p.paragraph_format.space_after = Pt(6)
+# Blank line
 
+# Comment: doc.add_heading('Flow Diagram', level=3)
               doc.add_heading('Flow Diagram', level=3)
+# Comment: add_mermaid_block(doc, build_mermaid(flow_el))
               add_mermaid_block(doc, build_mermaid(flow_el))
+# Blank line
 
+# Comment: doc.add_heading('Trigger', level=3)
               doc.add_heading('Trigger', level=3)
+# Comment: for k, v in trigger_info.items():
               for k, v in trigger_info.items():
+# Comment: add_kv(doc, k, v, indent=True)
                   add_kv(doc, k, v, indent=True)
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: doc.add_heading('Inputs', level=3)
               doc.add_heading('Inputs', level=3)
+# Comment: ttype = trigger_info.get('Type','')
               ttype = trigger_info.get('Type','')
+# Comment: if 'HTTP' in ttype:
               if 'HTTP' in ttype:
+# Comment: add_bullet(doc, 'Payload: Depends on HTTP method and client request body')
                   add_bullet(doc, 'Payload: Depends on HTTP method and client request body')
+# Comment: add_bullet(doc, f"Query Params: Inspect `{trigger_info.get('Path','')}` for para
                   add_bullet(doc, f"Query Params: Inspect `{trigger_info.get('Path','')}` for param usage")
+# Comment: add_bullet(doc, 'Headers: As provided by the HTTP client')
                   add_bullet(doc, 'Headers: As provided by the HTTP client')
+# Comment: add_bullet(doc, 'Variables: None expected at start')
                   add_bullet(doc, 'Variables: None expected at start')
+# Comment: elif 'Scheduler' in ttype or 'Fixed' in trigger_info.get('Schedule',''):
               elif 'Scheduler' in ttype or 'Fixed' in trigger_info.get('Schedule',''):
+# Comment: add_bullet(doc, 'Payload: None (scheduler-triggered)')
                   add_bullet(doc, 'Payload: None (scheduler-triggered)')
+# Comment: add_bullet(doc, 'Variables: Set internally during flow execution')
                   add_bullet(doc, 'Variables: Set internally during flow execution')
+# Comment: elif 'File' in ttype:
               elif 'File' in ttype:
+# Comment: add_bullet(doc, 'Payload: File content (binary or text)')
                   add_bullet(doc, 'Payload: File content (binary or text)')
+# Comment: add_bullet(doc, 'Attributes: File name, size, timestamps, directory path')
                   add_bullet(doc, 'Attributes: File name, size, timestamps, directory path')
+# Comment: elif 'JMS' in ttype or 'VM' in ttype:
               elif 'JMS' in ttype or 'VM' in ttype:
+# Comment: add_bullet(doc, 'Payload: Message body from queue/topic')
                   add_bullet(doc, 'Payload: Message body from queue/topic')
+# Comment: add_bullet(doc, 'Attributes: Message properties and headers')
                   add_bullet(doc, 'Attributes: Message properties and headers')
+# Comment: elif 'orphan' in ttype.lower() or 'None' in ttype:
               elif 'orphan' in ttype.lower() or 'None' in ttype:
+# Comment: add_bullet(doc, 'Payload: None (no trigger)')
                   add_bullet(doc, 'Payload: None (no trigger)')
+# Comment: add_bullet(doc, 'Variables: Expected to be set before flow-ref call')
                   add_bullet(doc, 'Variables: Expected to be set before flow-ref call')
+# Comment: else:
               else:
+# Comment: add_bullet(doc, 'Payload: Depends on trigger / caller')
                   add_bullet(doc, 'Payload: Depends on trigger / caller')
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: doc.add_heading('Logic Steps', level=3)
               doc.add_heading('Logic Steps', level=3)
+# Comment: p = doc.add_paragraph()
               p = doc.add_paragraph()
+# Comment: p.add_run(
               p.add_run(
+# Comment: 'Each step is shown below. Where a step contains a DataWeave script, '
                   'Each step is shown below. Where a step contains a DataWeave script, '
+# Comment: 'it is shown inline immediately beneath that step.'
                   'it is shown inline immediately beneath that step.'
+# Comment: ).italic = True
               ).italic = True
+# Comment: p.paragraph_format.space_after = Pt(4)
               p.paragraph_format.space_after = Pt(4)
+# Comment: add_logic_steps_with_dw(doc, flow_el)
               add_logic_steps_with_dw(doc, flow_el)
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: doc.add_heading('Connectors & Components Used', level=3)
               doc.add_heading('Connectors & Components Used', level=3)
+# Comment: rows = extract_connectors(flow_el)
               rows = extract_connectors(flow_el)
+# Comment: add_table(doc,
               add_table(doc,
+# Comment: ['Connector / Component', 'Operation', 'Config Ref', 'Key Attributes'],
                         ['Connector / Component', 'Operation', 'Config Ref', 'Key Attributes'],
+# Comment: rows,
                         rows,
+# Comment: [1.8, 1.2, 1.5, 1.8])
                         [1.8, 1.2, 1.5, 1.8])
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: doc.add_heading('Error Handling', level=3)
               doc.add_heading('Error Handling', level=3)
+# Comment: handlers = extract_error_handling(flow_el)
               handlers = extract_error_handling(flow_el)
+# Comment: if handlers:
               if handlers:
+# Comment: for strategy, error_type, notify in handlers:
                   for strategy, error_type, notify in handlers:
+# Comment: add_kv(doc, 'Strategy',    strategy,   indent=True)
                       add_kv(doc, 'Strategy',    strategy,   indent=True)
+# Comment: add_kv(doc, 'Error Types', error_type, indent=True)
                       add_kv(doc, 'Error Types', error_type, indent=True)
+# Comment: add_kv(doc, 'Notifications', notify,   indent=True)
                       add_kv(doc, 'Notifications', notify,   indent=True)
+# Comment: if strategy == 'on-error-continue':
                       if strategy == 'on-error-continue':
+# Comment: add_bullet(doc, 'Behaviour: Logs error and continues — parent scope does not fai
                           add_bullet(doc, 'Behaviour: Logs error and continues — parent scope does not fail')
+# Comment: else:
                       else:
+# Comment: add_bullet(doc, 'Behaviour: Propagates error to calling flow or default error ha
                           add_bullet(doc, 'Behaviour: Propagates error to calling flow or default error handler')
+# Comment: else:
               else:
+# Comment: add_bullet(doc, 'Strategy: None explicitly defined')
                   add_bullet(doc, 'Strategy: None explicitly defined')
+# Comment: add_bullet(doc, 'Error Types Caught: None')
                   add_bullet(doc, 'Error Types Caught: None')
+# Comment: add_bullet(doc, 'Handler Logic: Errors propagate to default Mule error handler')
                   add_bullet(doc, 'Handler Logic: Errors propagate to default Mule error handler')
+# Blank line
 
+# Comment: doc.add_heading('Outputs', level=3)
               doc.add_heading('Outputs', level=3)
+# Comment: vars_set = extract_set_vars(flow_el)
               vars_set = extract_set_vars(flow_el)
+# Comment: add_bullet(doc, 'Payload: As set by the last transform or connector in the flow'
               add_bullet(doc, 'Payload: As set by the last transform or connector in the flow')
+# Comment: add_bullet(doc, f"Variables Set: {', '.join(vars_set) if vars_set else 'None'}")
               add_bullet(doc, f"Variables Set: {', '.join(vars_set) if vars_set else 'None'}")
+# Blank line
 
+# Comment: doc.add_heading('Flow References', level=3)
               doc.add_heading('Flow References', level=3)
+# Comment: refs = extract_flow_refs(flow_el)
               refs = extract_flow_refs(flow_el)
+# Comment: if refs:
               if refs:
+# Comment: for r in refs:
                   for r in refs:
+# Comment: add_bullet(doc, f'`{r}` — called via flow-ref')
                       add_bullet(doc, f'`{r}` — called via flow-ref')
+# Comment: else:
               else:
+# Comment: doc.add_paragraph('None').italic = True
                   doc.add_paragraph('None').italic = True
+# Blank line
 
+# Comment: doc.add_heading('Configuration Properties Used', level=3)
               doc.add_heading('Configuration Properties Used', level=3)
+# Comment: props = extract_config_props(flow_el)
               props = extract_config_props(flow_el)
+# Comment: if props:
               if props:
+# Comment: for p in props:
                   for p in props:
+# Comment: add_bullet(doc, p)
                       add_bullet(doc, p)
+# Comment: else:
               else:
+# Comment: doc.add_paragraph('None').italic = True
                   doc.add_paragraph('None').italic = True
+# Blank line
 
+# Comment: add_divider(doc)
               add_divider(doc)
+# Comment: doc.add_paragraph()
               doc.add_paragraph()
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # FIND MULE XML FILES
           # FIND MULE XML FILES
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: xml_files      = []
           xml_files      = []
+# Comment: seen_filenames = set()
           seen_filenames = set()
+# Blank line
 
+# Comment: for search_root in [
           for search_root in [
+# Comment: os.path.join(EXTRACT_DIR, 'META-INF', 'mule-src'),
               os.path.join(EXTRACT_DIR, 'META-INF', 'mule-src'),
+# Comment: EXTRACT_DIR,
               EXTRACT_DIR,
+# Comment: ]:
           ]:
+# Comment: if not os.path.exists(search_root):
               if not os.path.exists(search_root):
+# Comment: continue
                   continue
+# Comment: for root, dirs, files in os.walk(search_root):
               for root, dirs, files in os.walk(search_root):
+# Comment: dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
                   dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+# Comment: for f in sorted(files):
                   for f in sorted(files):
+# Comment: if not f.endswith('.xml'):
                       if not f.endswith('.xml'):
+# Comment: continue
                           continue
+# Comment: full_path = os.path.join(root, f)
                       full_path = os.path.join(root, f)
+# Comment: if f not in seen_filenames and is_mule_file(full_path):
                       if f not in seen_filenames and is_mule_file(full_path):
+# Comment: seen_filenames.add(f)
                           seen_filenames.add(f)
+# Comment: xml_files.append(full_path)
                           xml_files.append(full_path)
+# Blank line
 
+# Comment: print(f'\nMule XML files to document ({len(xml_files)}):')
           print(f'\nMule XML files to document ({len(xml_files)}):')
+# Comment: for xf in xml_files:
           for xf in xml_files:
+# Comment: print(f'  {xf}')
               print(f'  {xf}')
+# Blank line
 
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: # BUILD DOCUMENT
           # BUILD DOCUMENT
+# Comment: # ─────────────────────────────────────────────────────────────
           # ─────────────────────────────────────────────────────────────
+# Comment: doc = Document()
           doc = Document()
+# Blank line
 
+# Comment: # Cover page
           # Cover page
+# Comment: cp = doc.add_paragraph()
           cp = doc.add_paragraph()
+# Comment: cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
           cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: cr = cp.add_run('MuleSoft Flow Documentation')
           cr = cp.add_run('MuleSoft Flow Documentation')
+# Comment: cr.bold = True
           cr.bold = True
+# Comment: cr.font.size = Pt(28)
           cr.font.size = Pt(28)
+# Comment: set_font_color(cr, BLUE_DARK)
           set_font_color(cr, BLUE_DARK)
+# Blank line
 
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Comment: sp = doc.add_paragraph()
           sp = doc.add_paragraph()
+# Comment: sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
           sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: sr = sp.add_run(f'Generated from: {JAR_NAME}')
           sr = sp.add_run(f'Generated from: {JAR_NAME}')
+# Comment: sr.font.size = Pt(13)
           sr.font.size = Pt(13)
+# Comment: set_font_color(sr, BLUE_LIGHT)
           set_font_color(sr, BLUE_LIGHT)
+# Blank line
 
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Comment: mp = doc.add_paragraph()
           mp = doc.add_paragraph()
+# Comment: mp.alignment = WD_ALIGN_PARAGRAPH.CENTER
           mp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+# Comment: mr = mp.add_run(f'Date: {TODAY}  |  Branch: {GITHUB_REF}  |  Commit: {GITHUB_SHA
           mr = mp.add_run(f'Date: {TODAY}  |  Branch: {GITHUB_REF}  |  Commit: {GITHUB_SHA}')
+# Comment: mr.font.size = Pt(10)
           mr.font.size = Pt(10)
+# Comment: set_font_color(mr, GREY)
           set_font_color(mr, GREY)
+# Comment: doc.add_page_break()
           doc.add_page_break()
+# Blank line
 
+# Comment: # Summary
           # Summary
+# Comment: doc.add_heading('Summary', level=1)
           doc.add_heading('Summary', level=1)
+# Comment: add_kv(doc, 'Generated from', ', '.join(f'`{os.path.basename(x)}`' for x in xml_
           add_kv(doc, 'Generated from', ', '.join(f'`{os.path.basename(x)}`' for x in xml_files))
+# Comment: add_kv(doc, 'Date',           TODAY)
           add_kv(doc, 'Date',           TODAY)
+# Comment: add_kv(doc, 'Branch/Commit',  f'{GITHUB_REF} / {GITHUB_SHA}')
           add_kv(doc, 'Branch/Commit',  f'{GITHUB_REF} / {GITHUB_SHA}')
+# Comment: doc.add_paragraph()
           doc.add_paragraph()
+# Blank line
 
+# Comment: total_flows = 0
           total_flows = 0
+# Comment: for xf in xml_files:
           for xf in xml_files:
+# Comment: try:
               try:
+# Comment: r = ET.parse(xf).getroot()
                   r = ET.parse(xf).getroot()
+# Comment: total_flows += len(
                   total_flows += len(
+# Comment: r.findall(f'{{{MULE_CORE_NS}}}flow') +
                       r.findall(f'{{{MULE_CORE_NS}}}flow') +
+# Comment: r.findall(f'{{{MULE_CORE_NS}}}sub-flow')
                       r.findall(f'{{{MULE_CORE_NS}}}sub-flow')
+# Comment: )
                   )
+# Comment: except: pass
               except: pass
+# Blank line
 
+# Comment: p = doc.add_paragraph(
           p = doc.add_paragraph(
+# Comment: f'This documentation covers {len(xml_files)} Mule XML file(s) and '
               f'This documentation covers {len(xml_files)} Mule XML file(s) and '
+# Comment: f'{total_flows} flow(s) extracted from `{JAR_NAME}`. '
               f'{total_flows} flow(s) extracted from `{JAR_NAME}`. '
+# Comment: f'Each flow section includes: a Mermaid flow diagram, logic steps with '
               f'Each flow section includes: a Mermaid flow diagram, logic steps with '
+# Comment: f'inline DataWeave scripts, trigger details, connectors used, '
               f'inline DataWeave scripts, trigger details, connectors used, '
+# Comment: f'error handling, outputs, flow references, and configuration properties.'
               f'error handling, outputs, flow references, and configuration properties.'
+# Comment: )
           )
+# Comment: p.paragraph_format.space_after = Pt(8)
           p.paragraph_format.space_after = Pt(8)
+# Comment: add_divider(doc)
           add_divider(doc)
+# Comment: doc.add_page_break()
           doc.add_page_break()
+# Blank line
 
+# Comment: # Per-file, per-flow
           # Per-file, per-flow
+# Comment: for xml_path in xml_files:
           for xml_path in xml_files:
+# Comment: fname = os.path.basename(xml_path)
               fname = os.path.basename(xml_path)
+# Comment: try:
               try:
+# Comment: tree    = ET.parse(xml_path)
                   tree    = ET.parse(xml_path)
+# Comment: root_el = tree.getroot()
                   root_el = tree.getroot()
+# Blank line
 
+# Comment: for el in root_el.iter():
                   for el in root_el.iter():
+# Comment: uri = get_ns_uri(el)
                       uri = get_ns_uri(el)
+# Comment: if uri and uri not in KNOWN_NS:
                       if uri and uri not in KNOWN_NS:
+# Comment: KNOWN_NS[uri] = uri.rstrip('/').split('/')[-1]
                           KNOWN_NS[uri] = uri.rstrip('/').split('/')[-1]
+# Blank line
 
+# Comment: flows = (
                   flows = (
+# Comment: root_el.findall(f'{{{MULE_CORE_NS}}}flow') +
                       root_el.findall(f'{{{MULE_CORE_NS}}}flow') +
+# Comment: root_el.findall(f'{{{MULE_CORE_NS}}}sub-flow')
                       root_el.findall(f'{{{MULE_CORE_NS}}}sub-flow')
+# Comment: )
                   )
+# Blank line
 
+# Comment: doc.add_heading(f'File: `{fname}`', level=1)
                   doc.add_heading(f'File: `{fname}`', level=1)
+# Blank line
 
+# Comment: if not flows:
                   if not flows:
+# Comment: p = doc.add_paragraph(
                       p = doc.add_paragraph(
+# Comment: '> This file contains Mule global configurations or namespace '
                           '> This file contains Mule global configurations or namespace '
+# Comment: 'declarations only — no flows are defined.'
                           'declarations only — no flows are defined.'
+# Comment: )
                       )
+# Comment: p.italic = True
                       p.italic = True
+# Comment: p.paragraph_format.space_after = Pt(8)
                       p.paragraph_format.space_after = Pt(8)
+# Comment: add_divider(doc)
                       add_divider(doc)
+# Comment: doc.add_paragraph()
                       doc.add_paragraph()
+# Comment: continue
                       continue
+# Blank line
 
+# Comment: for flow in flows:
                   for flow in flows:
+# Comment: document_flow(doc, flow, fname)
                       document_flow(doc, flow, fname)
+# Comment: doc.add_page_break()
                       doc.add_page_break()
+# Blank line
 
+# Comment: except ET.ParseError as e:
               except ET.ParseError as e:
+# Comment: doc.add_heading(f'File: `{fname}`', level=1)
                   doc.add_heading(f'File: `{fname}`', level=1)
+# Comment: doc.add_paragraph(f'Could not parse this file: {e}')
                   doc.add_paragraph(f'Could not parse this file: {e}')
+# Comment: add_divider(doc)
                   add_divider(doc)
+# Blank line
 
+# Comment: # Quality Checklist
           # Quality Checklist
+# Comment: doc.add_heading('Quality Checklist', level=1)
           doc.add_heading('Quality Checklist', level=1)
+# Comment: for item in [
           for item in [
+# Comment: 'Every Mule flow and sub-flow is completely documented.',
               'Every Mule flow and sub-flow is completely documented.',
+# Comment: 'Mermaid flow diagram generated for every flow.',
               'Mermaid flow diagram generated for every flow.',
+# Comment: 'DataWeave scripts shown inline under each step (not at the bottom).',
               'DataWeave scripts shown inline under each step (not at the bottom).',
+# Comment: 'Trigger details are specific (path, method, schedule, etc.).',
               'Trigger details are specific (path, method, schedule, etc.).',
+# Comment: 'Non-Mule XML files (pom.xml, log4j2.xml, etc.) are excluded.',
               'Non-Mule XML files (pom.xml, log4j2.xml, etc.) are excluded.',
+# Comment: 'Document name matches the JAR file name.',
               'Document name matches the JAR file name.',
+# Comment: 'Each run creates a new document — no overwriting other JARs.',
               'Each run creates a new document — no overwriting other JARs.',
+# Comment: ]:
           ]:
+# Comment: add_bullet(doc, f'[x] {item}')
               add_bullet(doc, f'[x] {item}')
+# Blank line
 
+# Comment: doc.save(DOC_NAME)
           doc.save(DOC_NAME)
+# Comment: print(f'\nSaved: {DOC_NAME}')
           print(f'\nSaved: {DOC_NAME}')
+# Comment: PYEOF
           PYEOF
+# Blank line
 
+# Comment: - name: Commit documentation
       - name: Commit documentation
+# Comment: run: |
         run: |
+# Comment: JAR_BASE="${{ github.event.inputs.jar_file }}"
           JAR_BASE="${{ github.event.inputs.jar_file }}"
+# Comment: DOC_NAME="${JAR_BASE%.jar}-flow-documentation.docx"
           DOC_NAME="${JAR_BASE%.jar}-flow-documentation.docx"
+# Comment: git config user.name "github-actions"
           git config user.name "github-actions"
+# Comment: git config user.email "actions@github.com"
           git config user.email "actions@github.com"
+# Comment: git add "${{ env.EXTRACT_DIR }}/" "$DOC_NAME"
           git add "${{ env.EXTRACT_DIR }}/" "$DOC_NAME"
+# Comment: git commit -m "docs: flow documentation for ${{ github.event.inputs.jar_file }}"
           git commit -m "docs: flow documentation for ${{ github.event.inputs.jar_file }}"
+# Comment: git push
           git push
