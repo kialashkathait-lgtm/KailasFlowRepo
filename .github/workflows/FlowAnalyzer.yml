@@ -1,7 +1,5 @@
 # Comment: name: MuleSoft JAR Documentation Generator
 name: MuleSoft JAR Documentation Generator
-# Blank line
-
 # Comment: on:
 on:
 # Comment: workflow_dispatch:
