@@ -1,7 +1,5 @@
 # Comment: name: MuleSoft JAR Documentation Generator (Claude API)
 name: MuleSoft JAR Documentation Generator (Claude API)
-# Blank line
-
 # Comment: on:
 on:
 # Comment: workflow_dispatch:
@@ -16,14 +14,10 @@ on:
         required: true
 # Comment: type: string
         type: string
-# Blank line
-
 # Comment: permissions:
 permissions:
 # Comment: contents: write
   contents: write
-# Blank line
-
 # Comment: jobs:
 jobs:
 # Comment: generate-docs:
@@ -44,8 +38,6 @@ jobs:
           persist-credentials: true
 # Comment: fetch-depth: 0
           fetch-depth: 0
-# Blank line
-
 # Comment: - name: Validate JAR exists
       - name: Validate JAR exists
 # Comment: run: |
@@ -58,8 +50,6 @@ jobs:
             exit 1
 # Comment: fi
           fi
-# Blank line
-
 # Comment: - name: Extract JAR
       - name: Extract JAR
 # Comment: run: |
@@ -76,14 +66,10 @@ jobs:
           echo "EXTRACT_DIR=$EXTRACT_DIR" >> $GITHUB_ENV
 # Comment: echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
           echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
-# Blank line
-
 # Comment: - name: Install dependencies
       - name: Install dependencies
 # Comment: run: pip install python-docx anthropic
         run: pip install python-docx anthropic
-# Blank line
-
 # Comment: - name: Write Python script
       - name: Write Python script
 # Comment: run: |
@@ -106,8 +92,6 @@ jobs:
           from docx.oxml.ns import qn
 # Comment: from docx.oxml import OxmlElement
           from docx.oxml import OxmlElement
-# Blank line
-
 # Comment: EXTRACT_DIR = os.environ.get('EXTRACT_DIR', 'extracted')
           EXTRACT_DIR = os.environ.get('EXTRACT_DIR', 'extracted')
 # Comment: JAR_NAME    = os.environ.get('JAR_NAME', 'unknown.jar')
@@ -162,14 +146,10 @@ jobs:
                     'Double check you copied the full key from console.anthropic.com '
 # Comment: 'with no truncation or extra characters.')
                     'with no truncation or extra characters.')
-# Blank line
-
 # Comment: client       = anthropic.Anthropic(api_key=_key)
           client       = anthropic.Anthropic(api_key=_key)
 # Comment: MULE_CORE_NS = 'http://www.mulesoft.org/schema/mule/core'
           MULE_CORE_NS = 'http://www.mulesoft.org/schema/mule/core'
-# Blank line
-
 # Comment: def read_xml(path):
           def read_xml(path):
 # Comment: try:
@@ -182,8 +162,6 @@ jobs:
               except:
 # Comment: return ''
                   return ''
-# Blank line
-
 # Comment: # ── Full diagnostic dump — show absolutely everything on disk ──
           # ── Full diagnostic dump — show absolutely everything on disk ──
 # Comment: print('=' * 70)
@@ -198,8 +176,6 @@ jobs:
           print(f'Contents of cwd     = {os.listdir(".")}')
 # Comment: print('=' * 70)
           print('=' * 70)
-# Blank line
-
 # Comment: if os.path.exists(EXTRACT_DIR):
           if os.path.exists(EXTRACT_DIR):
 # Comment: print(f'--- Full file tree under {EXTRACT_DIR} ---')
@@ -214,8 +190,6 @@ jobs:
           else:
 # Comment: print(f'!!! EXTRACT_DIR does not exist: {EXTRACT_DIR}')
               print(f'!!! EXTRACT_DIR does not exist: {EXTRACT_DIR}')
-# Blank line
-
 # Comment: # ── Collect every .xml file anywhere under EXTRACT_DIR ──
           # ── Collect every .xml file anywhere under EXTRACT_DIR ──
 # Comment: # No filtering, no namespace checks, no skipped directories.
@@ -226,8 +200,6 @@ jobs:
           xml_files = []
 # Comment: seen_filenames = set()
           seen_filenames = set()
-# Blank line
-
 # Comment: if os.path.exists(EXTRACT_DIR):
           if os.path.exists(EXTRACT_DIR):
 # Comment: for root, dirs, files in os.walk(EXTRACT_DIR):
@@ -246,8 +218,6 @@ jobs:
                               seen_filenames.add(f)
 # Comment: xml_files.append((f, full))
                               xml_files.append((f, full))
-# Blank line
-
 # Comment: print('=' * 70)
           print('=' * 70)
 # Comment: print(f'Total .xml files included for documentation: {len(xml_files)}')
@@ -260,12 +230,8 @@ jobs:
               print(f'  {fpath}  ({size} bytes)')
 # Comment: print('=' * 70)
           print('=' * 70)
-# Blank line
-
 # Comment: SYSTEM_PROMPT = open('/tmp/claude_prompt.txt').read()
           SYSTEM_PROMPT = open('/tmp/claude_prompt.txt').read()
-# Blank line
-
 # Comment: def call_claude(filename, xml_content):
           def call_claude(filename, xml_content):
 # Comment: print(f'  Calling Claude for: {filename} ({len(xml_content)} chars)...')
@@ -324,8 +290,6 @@ jobs:
                   print(f'  API error for {filename}: {e}')
 # Comment: return None
                   return None
-# Blank line
-
 # Comment: def parse_flow_blocks(response_text):
           def parse_flow_blocks(response_text):
 # Comment: blocks = []
@@ -354,8 +318,6 @@ jobs:
                   blocks.append({'name': name, 'type': ftype, 'raw': content})
 # Comment: return blocks
               return blocks
-# Blank line
-
 # Comment: SECTION_NAMES = [
           SECTION_NAMES = [
 # Comment: 'OVERVIEW','FLOW DIAGRAM','TRIGGER','INPUTS',
@@ -366,8 +328,6 @@ jobs:
               'OUTPUTS','FLOW REFERENCES','CONFIGURATION PROPERTIES',
 # Comment: ]
           ]
-# Blank line
-
 # Comment: def get_section(raw, section_name):
           def get_section(raw, section_name):
 # Comment: # Match ##SECTION_NAME## marker style
@@ -396,8 +356,6 @@ jobs:
               result = after[:end.start()].strip() if end else after.strip()
 # Comment: return result
               return result
-# Blank line
-
 # Comment: BLUE_DARK  = RGBColor(0x1F, 0x49, 0x7D)
           BLUE_DARK  = RGBColor(0x1F, 0x49, 0x7D)
 # Comment: BLUE_MID   = RGBColor(0x2E, 0x75, 0xB6)
@@ -414,8 +372,6 @@ jobs:
           BLACK      = RGBColor(0x00, 0x00, 0x00)
 # Comment: CODE_BG    = 'F2F2F2'
           CODE_BG    = 'F2F2F2'
-# Blank line
-
 # Comment: def shade_cell(cell, hex_color):
           def shade_cell(cell, hex_color):
 # Comment: tc = cell._tc
@@ -432,8 +388,6 @@ jobs:
               shd.set(qn('w:fill'), hex_color)
 # Comment: tcPr.append(shd)
               tcPr.append(shd)
-# Blank line
-
 # Comment: def add_divider(doc):
           def add_divider(doc):
 # Comment: p = doc.add_paragraph()
@@ -460,8 +414,6 @@ jobs:
               pBd.append(bt)
 # Comment: pPr.append(pBd)
               pPr.append(pBd)
-# Blank line
-
 # Comment: def add_kv(doc, key, value, indent=False):
           def add_kv(doc, key, value, indent=False):
 # Comment: p = doc.add_paragraph()
@@ -482,8 +434,6 @@ jobs:
               r2 = p.add_run(str(value) if value else '---')
 # Comment: r2.font.color.rgb = BLACK
               r2.font.color.rgb = BLACK
-# Blank line
-
 # Comment: def add_bullet(doc, text, indent=0.25, color=None):
           def add_bullet(doc, text, indent=0.25, color=None):
 # Comment: p = doc.add_paragraph()
@@ -500,8 +450,6 @@ jobs:
               if color:
 # Comment: run.font.color.rgb = color
                   run.font.color.rgb = color
-# Blank line
-
 # Comment: def add_code_block(doc, code, indent=0.25):
           def add_code_block(doc, code, indent=0.25):
 # Comment: for line in str(code).strip().split('\n'):
@@ -536,8 +484,6 @@ jobs:
                   run.font.color.rgb = BLACK
 # Comment: doc.add_paragraph().paragraph_format.space_after = Pt(4)
               doc.add_paragraph().paragraph_format.space_after = Pt(4)
-# Blank line
-
 # Comment: def add_table_from_markdown(doc, md_table_text):
           def add_table_from_markdown(doc, md_table_text):
 # Comment: lines = [l.strip() for l in md_table_text.strip().split('\n')
@@ -608,8 +554,6 @@ jobs:
                       run.font.size = Pt(9)
 # Comment: doc.add_paragraph().paragraph_format.space_after = Pt(4)
               doc.add_paragraph().paragraph_format.space_after = Pt(4)
-# Blank line
-
 # Comment: def render_logic_steps(doc, steps_text):
           def render_logic_steps(doc, steps_text):
 # Comment: if not steps_text.strip():
@@ -866,8 +810,6 @@ jobs:
                   sep = doc.add_paragraph()
 # Comment: sep.paragraph_format.space_after = Pt(3)
                   sep.paragraph_format.space_after = Pt(3)
-# Blank line
-
 # Comment: def render_flow(doc, block, filename):
           def render_flow(doc, block, filename):
 # Comment: name  = block['name']
@@ -876,8 +818,6 @@ jobs:
               ftype = block['type']
 # Comment: raw   = block['raw']
               raw   = block['raw']
-# Blank line
-
 # Comment: # Flow heading
               # Flow heading
 # Comment: doc.add_heading(f'Flow: {name}', level=2)
@@ -888,8 +828,6 @@ jobs:
               add_kv(doc, 'Flow Type', ftype)
 # Comment: doc.add_paragraph()
               doc.add_paragraph()
-# Blank line
-
 # Comment: # Overview
               # Overview
 # Comment: overview = get_section(raw, 'OVERVIEW')
@@ -902,8 +840,6 @@ jobs:
                   p = doc.add_paragraph(overview)
 # Comment: p.paragraph_format.space_after = Pt(6)
                   p.paragraph_format.space_after = Pt(6)
-# Blank line
-
 # Comment: # Flow Diagram
               # Flow Diagram
 # Comment: diagram = get_section(raw, 'FLOW DIAGRAM')
@@ -932,8 +868,6 @@ jobs:
                       diagram_clean = 'graph TD\n' + diagram_clean
 # Comment: add_code_block(doc, diagram_clean, indent=0.2)
                   add_code_block(doc, diagram_clean, indent=0.2)
-# Blank line
-
 # Comment: # Trigger
               # Trigger
 # Comment: trigger = get_section(raw, 'TRIGGER')
@@ -962,8 +896,6 @@ jobs:
                               add_kv(doc, k.strip(), v, indent=True)
 # Comment: doc.add_paragraph()
                   doc.add_paragraph()
-# Blank line
-
 # Comment: # Inputs
               # Inputs
 # Comment: inputs = get_section(raw, 'INPUTS')
@@ -982,8 +914,6 @@ jobs:
                           add_bullet(doc, line)
 # Comment: doc.add_paragraph()
                   doc.add_paragraph()
-# Blank line
-
 # Comment: # Logic Steps — inline DataWeave
               # Logic Steps — inline DataWeave
 # Comment: logic = get_section(raw, 'LOGIC STEPS')
@@ -1012,8 +942,6 @@ jobs:
                   doc.add_paragraph('').add_run('No logic steps found.').italic = True
 # Comment: doc.add_paragraph()
               doc.add_paragraph()
-# Blank line
-
 # Comment: # Connectors & Components
               # Connectors & Components
 # Comment: connectors = get_section(raw, 'CONNECTORS USED')
@@ -1040,8 +968,6 @@ jobs:
                   doc.add_paragraph('').add_run('None').italic = True
 # Comment: doc.add_paragraph()
               doc.add_paragraph()
-# Blank line
-
 # Comment: # Error Handling
               # Error Handling
 # Comment: error = get_section(raw, 'ERROR HANDLING')
@@ -1078,8 +1004,6 @@ jobs:
                   add_bullet(doc, 'Behaviour: Errors propagate to the default Mule error handler')
 # Comment: doc.add_paragraph()
               doc.add_paragraph()
-# Blank line
-
 # Comment: # Outputs
               # Outputs
 # Comment: outputs = get_section(raw, 'OUTPUTS')
@@ -1110,8 +1034,6 @@ jobs:
                           add_bullet(doc, line)
 # Comment: doc.add_paragraph()
                   doc.add_paragraph()
-# Blank line
-
 # Comment: # Flow References
               # Flow References
 # Comment: refs = get_section(raw, 'FLOW REFERENCES')
@@ -1132,8 +1054,6 @@ jobs:
               else:
 # Comment: doc.add_paragraph('').add_run('None').italic = True
                   doc.add_paragraph('').add_run('None').italic = True
-# Blank line
-
 # Comment: # Config Properties
               # Config Properties
 # Comment: props = get_section(raw, 'CONFIGURATION PROPERTIES')
@@ -1154,14 +1074,10 @@ jobs:
               else:
 # Comment: doc.add_paragraph('').add_run('None').italic = True
                   doc.add_paragraph('').add_run('None').italic = True
-# Blank line
-
 # Comment: add_divider(doc)
               add_divider(doc)
 # Comment: doc.add_paragraph()
               doc.add_paragraph()
-# Blank line
-
 # Comment: all_results = []
           all_results = []
 # Comment: for fname, fpath in xml_files:
@@ -1186,14 +1102,10 @@ jobs:
                   all_results.append((fname, blocks))
 # Comment: time.sleep(1)
               time.sleep(1)
-# Blank line
-
 # Comment: total_flows = sum(len(b) for _, b in all_results)
           total_flows = sum(len(b) for _, b in all_results)
 # Comment: print(f'Total flows documented: {total_flows}')
           print(f'Total flows documented: {total_flows}')
-# Blank line
-
 # Comment: doc = Document()
           doc = Document()
 # Comment: cp = doc.add_paragraph()
@@ -1318,8 +1230,6 @@ jobs:
           print(f'Saved: {DOC_NAME}')
 # Comment: SCRIPTEOF
           SCRIPTEOF
-# Blank line
-
 # Comment: - name: Write Claude prompt file
       - name: Write Claude prompt file
 # Comment: run: |
@@ -1332,8 +1242,6 @@ jobs:
           You will receive the raw XML content of a MuleSoft Mule 4 flow file.
 # Comment: Your task is to produce thorough, accurate, human-readable documentation for EVE
           Your task is to produce thorough, accurate, human-readable documentation for EVERY <mule:flow> and <mule:sub-flow> found in the XML.
-# Blank line
-
 # Comment: IMPORTANT: Read the XML carefully. Extract real values - real flow names, real p
           IMPORTANT: Read the XML carefully. Extract real values - real flow names, real paths, real DataWeave scripts, real connector names. Do not make up or guess anything.
 # Blank line
@@ -1350,8 +1258,6 @@ jobs:
           FLOW_NAME: <copy the exact name attribute from the mule:flow or mule:sub-flow element>
 # Comment: FLOW_TYPE: <write: flow   OR   sub-flow>
           FLOW_TYPE: <write: flow   OR   sub-flow>
-# Blank line
-
 # Comment: ##OVERVIEW##
           ##OVERVIEW##
 # Comment: Write 3 to 5 sentences in plain English describing:
@@ -1366,8 +1272,6 @@ jobs:
           - What the final result or output is
 # Comment: A business analyst with no technical background should be able to read this and 
           A business analyst with no technical background should be able to read this and understand the flow.
-# Blank line
-
 # Comment: ##FLOW DIAGRAM##
           ##FLOW DIAGRAM##
 # Comment: Write a Mermaid graph TD diagram showing the EXACT steps in this flow in order.
@@ -1400,8 +1304,6 @@ jobs:
           - Use only letters numbers and basic punctuation in node labels - no quotes or special chars
 # Comment: Do NOT show a generic example - show the ACTUAL flow from the XML.
           Do NOT show a generic example - show the ACTUAL flow from the XML.
-# Blank line
-
 # Comment: ##TRIGGER##
           ##TRIGGER##
 # Comment: - Type: <HTTP Listener or Scheduler or File Listener or JMS Listener or VM Liste
@@ -1420,22 +1322,16 @@ jobs:
           - Destination: <queue or topic name if JMS or VM - read from XML>
 # Comment: - Config Ref: <exact config-ref attribute value - read from XML>
           - Config Ref: <exact config-ref attribute value - read from XML>
-# Blank line
-
 # Comment: ##INPUTS##
           ##INPUTS##
 # Comment: - <List each type of input this flow expects. For HTTP flows: describe the expec
           - <List each type of input this flow expects. For HTTP flows: describe the expected request body shape, any required query params, required headers. For scheduled flows: state there is no inbound payload. Be specific about data types and field names if you can infer them from the DataWeave scripts.>
-# Blank line
-
 # Comment: ##LOGIC STEPS##
           ##LOGIC STEPS##
 # Comment: Document EVERY component inside the flow in the order they appear in the XML.
           Document EVERY component inside the flow in the order they appear in the XML.
 # Comment: For each component write a step block exactly like this - do not skip any compon
           For each component write a step block exactly like this - do not skip any component:
-# Blank line
-
 # Comment: STEP 1: <Exact component type e.g. HTTP Listener, Logger, Set Variable, DataWeav
           STEP 1: <Exact component type e.g. HTTP Listener, Logger, Set Variable, DataWeave Transform, DB Select, HTTP Request, Object Store Retrieve, Choice Router, Scatter-Gather, Try Scope, Flow Reference>
 # Comment: Description: <Write 3 to 5 sentences in plain English explaining exactly what th
@@ -1468,8 +1364,6 @@ jobs:
           <If this step contains a DataWeave script copy it here EXACTLY as written in the XML - every line - do not change or summarize it. If there is no DataWeave script delete this DataWeave block entirely.>
 # Comment: ```
           ```
-# Blank line
-
 # Comment: <If this step is a Choice Router add a ROUTE block for EACH when and otherwise b
           <If this step is a Choice Router add a ROUTE block for EACH when and otherwise branch:>
 # Comment: ROUTE when <exact expression from XML>:
@@ -1492,8 +1386,6 @@ jobs:
             STEP A: <component inside otherwise branch>
 # Comment: Description: <description>
             Description: <description>
-# Blank line
-
 # Comment: <If this step is a Scatter-Gather add a ROUTE block for EACH parallel route:>
           <If this step is a Scatter-Gather add a ROUTE block for EACH parallel route:>
 # Comment: ROUTE 1:
@@ -1516,8 +1408,6 @@ jobs:
             STEP A: <component>
 # Comment: Description: <description>
             Description: <description>
-# Blank line
-
 # Comment: <If this step is a Try Scope add inner steps and error handler:>
           <If this step is a Try Scope add inner steps and error handler:>
 # Comment: ROUTE try:
@@ -1540,8 +1430,6 @@ jobs:
             STEP A: <on-error-continue or on-error-propagate>
 # Comment: Description: <what happens on error>
             Description: <what happens on error>
-# Blank line
-
 # Comment: ##CONNECTORS USED##
           ##CONNECTORS USED##
 # Comment: | Connector | Operation | Config Ref | Key Details |
@@ -1550,8 +1438,6 @@ jobs:
           |-----------|-----------|------------|-------------|
 # Comment: <One row per unique connector or Mule component. Include HTTP, DB, Object Store,
           <One row per unique connector or Mule component. Include HTTP, DB, Object Store, File, JMS, VM, Salesforce, Logger, Set Payload, Set Variable, DataWeave, Scheduler, Flow Reference etc. Read config-ref and key attributes from the XML.>
-# Blank line
-
 # Comment: ##ERROR HANDLING##
           ##ERROR HANDLING##
 # Comment: - Strategy: <on-error-propagate or on-error-continue or None - read from XML>
@@ -1560,30 +1446,22 @@ jobs:
           - Error Types Caught: <list error types from type attribute or write ANY or None>
 # Comment: - Behaviour: <plain English: what exactly happens when an error occurs in this f
           - Behaviour: <plain English: what exactly happens when an error occurs in this flow>
-# Blank line
-
 # Comment: ##OUTPUTS##
           ##OUTPUTS##
 # Comment: - Payload: <describe exactly what the final payload contains after this flow com
           - Payload: <describe exactly what the final payload contains after this flow completes - data type, shape, fields>
 # Comment: - Variables Set: <list every variable name set via set-variable in this flow, or
           - Variables Set: <list every variable name set via set-variable in this flow, or write None>
-# Blank line
-
 # Comment: ##FLOW REFERENCES##
           ##FLOW REFERENCES##
 # Comment: <List every flow-ref name attribute found in this flow. Write None if there are 
           <List every flow-ref name attribute found in this flow. Write None if there are none.>
-# Blank line
-
 # Comment: ##CONFIGURATION PROPERTIES##
           ##CONFIGURATION PROPERTIES##
 # Comment: <List every ${property.name} placeholder found anywhere in this flow XML. Write 
           <List every ${property.name} placeholder found anywhere in this flow XML. Write None if there are none.>
 # Comment: @@FLOW_END@@
           @@FLOW_END@@
-# Blank line
-
 # Comment: ===== CRITICAL RULES =====
           ===== CRITICAL RULES =====
 # Comment: 1. Write one @@FLOW_START@@ to @@FLOW_END@@ block for EVERY flow and sub-flow - 
@@ -1602,8 +1480,6 @@ jobs:
           7. Write NOTHING outside the @@FLOW_START@@ and @@FLOW_END@@ markers.
 # Comment: PROMPTEOF
           PROMPTEOF
-# Blank line
-
 # Comment: - name: Run documentation generator
       - name: Run documentation generator
 # Comment: env:
@@ -1616,8 +1492,6 @@ jobs:
           JAR_NAME: ${{ env.JAR_NAME }}
 # Comment: run: python3 /tmp/generate_docs.py
         run: python3 /tmp/generate_docs.py
-# Blank line
-
 # Comment: - name: Commit documentation
       - name: Commit documentation
 # Comment: run: |
@@ -1626,34 +1500,24 @@ jobs:
           JAR_BASE="${{ github.event.inputs.jar_file }}"
 # Comment: DOC_NAME="${JAR_BASE%.jar}-flow-documentation.docx"
           DOC_NAME="${JAR_BASE%.jar}-flow-documentation.docx"
-# Blank line
-
 # Comment: # Set git identity
           # Set git identity
 # Comment: git config user.name "github-actions[bot]"
           git config user.name "github-actions[bot]"
 # Comment: git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-# Blank line
-
 # Comment: # Set remote URL with PAT so push is always authenticated
           # Set remote URL with PAT so push is always authenticated
 # Comment: git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-# Blank line
-
 # Comment: # Pull latest master to stay in sync
           # Pull latest master to stay in sync
 # Comment: git pull origin master --rebase
           git pull origin master --rebase
-# Blank line
-
 # Comment: # Stage only the doc file — skip binary cache files
           # Stage only the doc file — skip binary cache files
 # Comment: git add "$DOC_NAME" || true
           git add "$DOC_NAME" || true
-# Blank line
-
 # Comment: # Commit only if there are staged changes
           # Commit only if there are staged changes
 # Comment: if git diff --cached --quiet; then
